@@ -7,6 +7,10 @@ const PREP_SECONDS_EARLY = 15;
 const PREP_SECONDS_NORMAL = 25;
 const TIMER_TICK_MS = 250;
 const POST_BATTLE_DELAY_MS = 1400;
+const BATTLE_INTRO_DELAY_MS = 450;
+const BATTLE_ACTION_DELAY_MS = 620;
+const BATTLE_HIT_DELAY_MS = 420;
+const BATTLE_CLEANUP_DELAY_MS = 320;
 const LONG_PRESS_MS = 140;
 const DRAG_CANCEL_DISTANCE = 24;
 
@@ -195,6 +199,8 @@ const byId = new Map(MINION_POOL.map((minion) => [minion.id, minion]));
 let nextInstanceId = 1;
 let prepTimerId = null;
 let postBattleTimerId = null;
+let battleAnimationTimerId = null;
+let battleAnimationRunId = 0;
 let dragState = createDragState();
 
 const state = createInitialState();
@@ -215,6 +221,9 @@ const elements = {
   battleView: document.querySelector("#battle-view"),
   battleEnemy: document.querySelector("#battle-enemy-board"),
   battlePlayer: document.querySelector("#battle-player-board"),
+  battleSummary: document.querySelector("#battle-summary"),
+  battleProgress: document.querySelector("#battle-progress"),
+  combatLog: document.querySelector("#combat-log"),
   refreshBtn: document.querySelector("#refresh-btn"),
   upgradeBtn: document.querySelector("#upgrade-btn"),
   freezeBtn: document.querySelector("#freeze-btn"),
@@ -259,14 +268,33 @@ function createInitialState() {
       summary: "战斗尚未开始。",
       playerSnapshot: [],
       enemySnapshot: [],
+      logs: [],
       winner: "draw",
     },
+    battleAnimation: createBattleAnimationState(),
     message: getPrepStartMessage(1),
   };
 
   initial.shop = generateShop(initial.tavernTier);
   initial.enemyBoard = generateEnemyBoard(initial.turn);
   return initial;
+}
+
+function createBattleAnimationState() {
+  return {
+    active: false,
+    isAnimating: false,
+    playerBoard: [],
+    enemyBoard: [],
+    attackerId: null,
+    defenderId: null,
+    attackerSide: "",
+    defenderSide: "",
+    hitIds: [],
+    defeatedIds: [],
+    progressLabel: "等待开战",
+    logLines: [],
+  };
 }
 
 function createDragState() {
@@ -292,6 +320,7 @@ function createDragState() {
 function resetGame() {
   stopPrepTimer();
   stopPostBattleReturn();
+  stopBattlePlayback();
   cleanupDragState();
   const freshState = createInitialState();
   Object.assign(state, freshState);
@@ -390,10 +419,17 @@ function renderPlayerBoard() {
 }
 
 function renderBattleBoards() {
-  const playerSnapshot =
-    state.phase === "prep" ? state.board : state.lastBattle.playerSnapshot;
-  const enemySnapshot =
-    state.phase === "prep" ? state.enemyBoard : state.lastBattle.enemySnapshot;
+  const usingAnimation = state.phase === "battle" && state.battleAnimation.active;
+  const playerSnapshot = state.phase === "prep"
+    ? state.board
+    : usingAnimation
+      ? state.battleAnimation.playerBoard
+      : state.lastBattle.playerSnapshot;
+  const enemySnapshot = state.phase === "prep"
+    ? state.enemyBoard
+    : usingAnimation
+      ? state.battleAnimation.enemyBoard
+      : state.lastBattle.enemySnapshot;
 
   renderBattleLane(
     elements.battleEnemy,
@@ -405,6 +441,7 @@ function renderBattleBoards() {
     playerSnapshot,
     "你的战队会在战斗阶段显示在这里。"
   );
+  renderBattleLog();
 }
 
 function renderBattleLane(container, minions, emptyText) {
@@ -419,22 +456,35 @@ function renderBattleLane(container, minions, emptyText) {
   }
 
   minions.forEach((minion, index) => {
+    const side = container === elements.battlePlayer ? "player" : "enemy";
     const card = buildMinionCard(minion, {
       battle: true,
       showActions: false,
       slotLabel: `位置 ${index + 1}`,
+      battleVisual: getBattleVisualState(minion, side),
     });
     container.appendChild(card);
   });
 }
 
 function buildMinionCard(minion, options = {}) {
-  const { battle = false, showActions = true, slotLabel = "" } = options;
+  const { battle = false, showActions = true, slotLabel = "", battleVisual = null } = options;
   const healthValue = Math.max(0, minion.health);
   const healthClass = healthValue <= 0 ? "zero" : healthValue <= 2 ? "low" : "";
+  const battleStateClasses = battleVisual
+    ? [
+        battleVisual.isAttacker ? "attacking" : "",
+        battleVisual.isDefender ? "defending" : "",
+        battleVisual.chargeClass,
+        battleVisual.takingHit ? "taking-hit" : "",
+        battleVisual.defeated ? "defeated" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "";
 
   const card = document.createElement("article");
-  card.className = `minion-card${minion.golden ? " golden" : ""}${battle ? " battle-card" : ""}`;
+  card.className = `minion-card${minion.golden ? " golden" : ""}${battle ? " battle-card" : ""}${battleStateClasses ? ` ${battleStateClasses}` : ""}`;
 
   const keywords = minion.keywords
     .map((keyword) => {
@@ -450,7 +500,12 @@ function buildMinionCard(minion, options = {}) {
     .join("");
 
   const battleTop = battle
-    ? `<div class="battle-card-top"><span class="battle-slot">${slotLabel}</span></div>`
+    ? `
+      <div class="battle-card-top">
+        <span class="battle-slot">${slotLabel}</span>
+        ${battleVisual?.roleLabel ? `<span class="battle-role ${battleVisual.roleClass}">${battleVisual.roleLabel}</span>` : ""}
+      </div>
+    `
     : "";
 
   const infoToggle = !battle ? '<button type="button" class="card-info-toggle" aria-label="查看描述">i</button>' : "";
@@ -501,6 +556,67 @@ function buildMinionCard(minion, options = {}) {
   });
 
   return card;
+}
+
+function getBattleVisualState(minion, side) {
+  const animation = state.battleAnimation;
+  if (state.phase !== "battle" || !animation.active) {
+    return null;
+  }
+
+  const isAttacker = animation.attackerId === minion.instanceId && animation.attackerSide === side;
+  const isDefender = animation.defenderId === minion.instanceId && animation.defenderSide === side;
+
+  return {
+    isAttacker,
+    isDefender,
+    takingHit: animation.hitIds.includes(minion.instanceId),
+    defeated: animation.defeatedIds.includes(minion.instanceId),
+    chargeClass: isAttacker ? (side === "player" ? "charge-player" : "charge-enemy") : "",
+    roleLabel: isAttacker ? "进攻" : isDefender ? "受击" : "",
+    roleClass: isAttacker ? "attacker" : isDefender ? "defender" : "",
+  };
+}
+
+function renderBattleLog() {
+  if (elements.battleSummary) {
+    elements.battleSummary.textContent = state.lastBattle.summary;
+  }
+  if (elements.battleProgress) {
+    elements.battleProgress.textContent =
+      state.phase === "battle" && state.battleAnimation.active
+        ? state.battleAnimation.progressLabel
+        : state.phase === "prep"
+          ? "等待开战"
+          : "战斗结束";
+  }
+  if (!elements.combatLog) {
+    return;
+  }
+
+  const logLines =
+    state.phase === "battle" && state.battleAnimation.active
+      ? state.battleAnimation.logLines
+      : state.lastBattle.logs;
+
+  elements.combatLog.innerHTML = "";
+
+  if (!logLines.length) {
+    const line = document.createElement("div");
+    line.className = "log-line";
+    line.textContent = state.phase === "prep" ? "战斗记录会在开战后依次显示。" : "这场战斗没有产生可展示的战斗记录。";
+    elements.combatLog.appendChild(line);
+    return;
+  }
+
+  logLines.forEach((text) => {
+    const line = document.createElement("div");
+    line.className = "log-line";
+    line.textContent = text;
+    elements.combatLog.appendChild(line);
+  });
+
+  elements.combatLog.scrollTop = elements.combatLog.scrollHeight;
 }
 
 function makeMiniButton(label, onClick, disabled, variant = "alt") {
@@ -1108,6 +1224,7 @@ function buildRecruitMessage(baseMessage, mergedMinions) {
 function startPrepPhase() {
   stopPrepTimer();
   stopPostBattleReturn();
+  stopBattlePlayback();
   state.phase = "prep";
   state.timeLeft = getPrepDuration(state.turn);
   state.prepEndsAt = Date.now() + state.timeLeft * 1000;
@@ -1146,41 +1263,52 @@ function endTurnAndBattle(trigger = "manual") {
 
   stopPrepTimer();
   stopPostBattleReturn();
+  stopBattlePlayback();
   state.timeLeft = 0;
 
   const intro = trigger === "timer" ? "准备时间结束，自动进入战斗。" : "你提前结束了准备阶段。";
   const result = simulateBattle(state.board, state.enemyBoard);
+  const damage = result.winner === "enemy"
+    ? Math.max(1, result.remainingEnemy.reduce((sum, minion) => sum + minion.tier, 0))
+    : 0;
+  const roundMessage =
+    result.winner === "player"
+      ? "这回合打赢了。"
+      : result.winner === "enemy"
+        ? `这回合没打过，掉了 ${damage} 点血。`
+        : "这回合打平了。";
 
-  if (result.winner === "player") {
-    state.message = "这回合打赢了。";
-  } else if (result.winner === "enemy") {
-    const damage = Math.max(1, result.remainingEnemy.reduce((sum, minion) => sum + minion.tier, 0));
-    state.hp -= damage;
-    state.message = `这回合没打过，掉了 ${damage} 点血。`;
-  } else {
-    state.message = "这回合打平了。";
-  }
-
+  state.phase = "battle";
   state.lastBattle = {
-    summary: `${intro}${result.summary}`,
+    summary: intro,
     playerSnapshot: state.board.map(copyMinion),
     enemySnapshot: state.enemyBoard.map(copyMinion),
+    logs: [],
     winner: result.winner,
   };
+  state.message = "战斗开始，正在结算中。";
+  beginBattlePlayback(result, intro, roundMessage, damage);
+}
 
-  if (state.hp <= 0) {
-    state.phase = "gameOver";
-    state.message = "酒馆之旅结束了，点击重新开始可以再来一局。";
-  } else {
-    state.phase = "battle";
-    stopPostBattleReturn();
-    postBattleTimerId = window.setTimeout(() => {
-      postBattleTimerId = null;
-      continueToNextTurn();
-    }, POST_BATTLE_DELAY_MS);
-  }
-
+function beginBattlePlayback(result, intro, roundMessage, damage) {
+  const runId = ++battleAnimationRunId;
+  state.battleAnimation = {
+    active: true,
+    isAnimating: true,
+    playerBoard: result.startingPlayer.map(copyMinion),
+    enemyBoard: result.startingEnemy.map(copyMinion),
+    attackerId: null,
+    defenderId: null,
+    attackerSide: "",
+    defenderSide: "",
+    hitIds: [],
+    defeatedIds: [],
+    progressLabel: "战斗开始",
+    logLines: [],
+  };
   render();
+
+  void playBattleFrames(runId, result, intro, roundMessage, damage);
 }
 
 function continueToNextTurn() {
@@ -1198,6 +1326,92 @@ function stopPostBattleReturn() {
     window.clearTimeout(postBattleTimerId);
     postBattleTimerId = null;
   }
+}
+
+function stopBattlePlayback() {
+  battleAnimationRunId += 1;
+  if (battleAnimationTimerId !== null) {
+    window.clearTimeout(battleAnimationTimerId);
+    battleAnimationTimerId = null;
+  }
+  state.battleAnimation = createBattleAnimationState();
+}
+
+function waitBattleDelay(ms) {
+  return new Promise((resolve) => {
+    battleAnimationTimerId = window.setTimeout(() => {
+      battleAnimationTimerId = null;
+      resolve();
+    }, ms);
+  });
+}
+
+async function playBattleFrames(runId, result, intro, roundMessage, damage) {
+  await waitBattleDelay(BATTLE_INTRO_DELAY_MS);
+  if (runId !== battleAnimationRunId) {
+    return;
+  }
+
+  for (const frame of result.frames) {
+    state.battleAnimation.playerBoard = frame.playerBoard.map(copyMinion);
+    state.battleAnimation.enemyBoard = frame.enemyBoard.map(copyMinion);
+    state.battleAnimation.attackerId = frame.attackerId;
+    state.battleAnimation.defenderId = frame.defenderId;
+    state.battleAnimation.attackerSide = frame.attackerSide;
+    state.battleAnimation.defenderSide = frame.defenderSide;
+    state.battleAnimation.hitIds = [...frame.hitIds];
+    state.battleAnimation.defeatedIds = [...frame.defeatedIds];
+    state.battleAnimation.progressLabel = frame.progress;
+    if (frame.log) {
+      state.battleAnimation.logLines = [...state.battleAnimation.logLines, frame.log];
+    }
+    render();
+    await waitBattleDelay(frame.delay);
+    if (runId !== battleAnimationRunId) {
+      return;
+    }
+  }
+
+  if (damage > 0) {
+    state.hp -= damage;
+  }
+
+  state.battleAnimation = {
+    ...state.battleAnimation,
+    active: true,
+    isAnimating: false,
+    playerBoard: result.remainingPlayer.map(copyMinion),
+    enemyBoard: result.remainingEnemy.map(copyMinion),
+    attackerId: null,
+    defenderId: null,
+    attackerSide: "",
+    defenderSide: "",
+    hitIds: [],
+    defeatedIds: [],
+    progressLabel: result.summary,
+  };
+  state.lastBattle = {
+    summary: `${intro}${result.summary}`,
+    playerSnapshot: result.startingPlayer.map(copyMinion),
+    enemySnapshot: result.startingEnemy.map(copyMinion),
+    logs: [...result.logs],
+    winner: result.winner,
+  };
+
+  if (state.hp <= 0) {
+    state.phase = "gameOver";
+    state.message = "酒馆之旅结束了，点击重新开始可以再来一局。";
+  } else {
+    state.phase = "battle";
+    state.message = roundMessage;
+    stopPostBattleReturn();
+    postBattleTimerId = window.setTimeout(() => {
+      postBattleTimerId = null;
+      continueToNextTurn();
+    }, POST_BATTLE_DELAY_MS);
+  }
+
+  render();
 }
 
 function startNextTurn() {
@@ -1241,13 +1455,15 @@ function simulateBattle(playerBoard, enemyBoard) {
   const player = playerBoard.map(cloneForBattle);
   const enemy = enemyBoard.map(cloneForBattle);
   const logs = [];
+  const frames = [];
 
-  resolveCombatStartEffects(player, enemy, logs);
+  resolveCombatStartEffects(player, enemy, logs, frames);
 
   let attackerSide = chooseStartingSide(player, enemy);
   let playerPointer = 0;
   let enemyPointer = 0;
   let turns = 0;
+  let exchange = 1;
 
   while (player.length > 0 && enemy.length > 0 && turns < 40) {
     const attackers = attackerSide === "player" ? player : enemy;
@@ -1269,24 +1485,74 @@ function simulateBattle(playerBoard, enemyBoard) {
     const attacker = attackers[attackerIndex];
     const defenderIndex = chooseTargetIndex(defenders);
     const defender = defenders[defenderIndex];
+    const progress = `第 ${exchange} 次交锋`;
+    const attackMessage = `${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。`;
 
-    logs.push(`${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。`);
+    logs.push(attackMessage);
+    frames.push(
+      createBattleFrame(player, enemy, {
+        attackerId: attacker.instanceId,
+        defenderId: defender.instanceId,
+        attackerSide,
+        defenderSide: attackerSide === "player" ? "enemy" : "player",
+        log: attackMessage,
+        progress,
+        delay: BATTLE_ACTION_DELAY_MS,
+      })
+    );
 
     const attackerDamageNote = applyDamage(attacker, defender.attack);
     const defenderDamageNote = applyDamage(defender, attacker.attack);
+    frames.push(
+      createBattleFrame(player, enemy, {
+        attackerId: attacker.instanceId,
+        defenderId: defender.instanceId,
+        attackerSide,
+        defenderSide: attackerSide === "player" ? "enemy" : "player",
+        hitIds: [attacker.instanceId, defender.instanceId],
+        progress,
+        delay: BATTLE_HIT_DELAY_MS,
+      })
+    );
 
     if (attackerDamageNote === "shield") {
-      logs.push(`${attacker.name} 的圣盾被打掉了。`);
+      const message = `${attacker.name} 的圣盾被打掉了。`;
+      logs.push(message);
+      frames.push(
+        createBattleFrame(player, enemy, {
+          attackerId: attacker.instanceId,
+          defenderId: defender.instanceId,
+          attackerSide,
+          defenderSide: attackerSide === "player" ? "enemy" : "player",
+          hitIds: [attacker.instanceId],
+          log: message,
+          progress,
+          delay: BATTLE_HIT_DELAY_MS,
+        })
+      );
     }
     if (defenderDamageNote === "shield") {
-      logs.push(`${defender.name} 的圣盾被打掉了。`);
+      const message = `${defender.name} 的圣盾被打掉了。`;
+      logs.push(message);
+      frames.push(
+        createBattleFrame(player, enemy, {
+          attackerId: attacker.instanceId,
+          defenderId: defender.instanceId,
+          attackerSide,
+          defenderSide: attackerSide === "player" ? "enemy" : "player",
+          hitIds: [defender.instanceId],
+          log: message,
+          progress,
+          delay: BATTLE_HIT_DELAY_MS,
+        })
+      );
     }
 
-    cleanupBoard(player, "我方", logs);
-    cleanupBoard(enemy, "敌方", logs);
+    cleanupBattlefield(player, enemy, logs, frames, progress);
 
     attackerSide = attackerSide === "player" ? "enemy" : "player";
     turns += 1;
+    exchange += 1;
   }
 
   let winner = "draw";
@@ -1303,23 +1569,25 @@ function simulateBattle(playerBoard, enemyBoard) {
     winner,
     summary,
     logs,
+    frames,
+    startingPlayer: playerBoard.map(copyMinion),
+    startingEnemy: enemyBoard.map(copyMinion),
     remainingPlayer: player.map(copyMinion),
     remainingEnemy: enemy.map(copyMinion),
   };
 }
 
-function resolveCombatStartEffects(player, enemy, logs) {
+function resolveCombatStartEffects(player, enemy, logs, frames) {
   const playerEntries = player.filter((minion) => minion.combatStart);
   const enemyEntries = enemy.filter((minion) => minion.combatStart);
 
-  playerEntries.forEach((minion) => applyCombatStartAbility(minion, enemy, logs));
-  enemyEntries.forEach((minion) => applyCombatStartAbility(minion, player, logs));
+  playerEntries.forEach((minion) => applyCombatStartAbility(minion, "player", enemy, player, enemy, logs, frames));
+  enemyEntries.forEach((minion) => applyCombatStartAbility(minion, "enemy", player, player, enemy, logs, frames));
 
-  cleanupBoard(player, "我方", logs);
-  cleanupBoard(enemy, "敌方", logs);
+  cleanupBattlefield(player, enemy, logs, frames, "战斗开始");
 }
 
-function applyCombatStartAbility(source, targets, logs) {
+function applyCombatStartAbility(source, side, targets, player, enemy, logs, frames) {
   if (!source.combatStart || source.combatStart.type !== "deal-random-damage") {
     return;
   }
@@ -1331,10 +1599,47 @@ function applyCombatStartAbility(source, targets, logs) {
 
   const target = pickRandom(livingTargets);
   const amount = source.combatStart.amount ?? 0;
-  logs.push(`${source.name} 在战斗开始时命中 ${target.name}，造成 ${amount} 点伤害。`);
+  const message = `${source.name} 在战斗开始时命中 ${target.name}，造成 ${amount} 点伤害。`;
+  const defenderSide = side === "player" ? "enemy" : "player";
+  logs.push(message);
+  frames.push(
+    createBattleFrame(player, enemy, {
+      attackerId: source.instanceId,
+      defenderId: target.instanceId,
+      attackerSide: side,
+      defenderSide,
+      log: message,
+      progress: "战斗开始",
+      delay: BATTLE_ACTION_DELAY_MS,
+    })
+  );
   const note = applyDamage(target, amount);
+  frames.push(
+    createBattleFrame(player, enemy, {
+      attackerId: source.instanceId,
+      defenderId: target.instanceId,
+      attackerSide: side,
+      defenderSide,
+      hitIds: [target.instanceId],
+      progress: "战斗开始",
+      delay: BATTLE_HIT_DELAY_MS,
+    })
+  );
   if (note === "shield") {
-    logs.push(`${target.name} 的圣盾被打掉了。`);
+    const shieldMessage = `${target.name} 的圣盾被打掉了。`;
+    logs.push(shieldMessage);
+    frames.push(
+      createBattleFrame(player, enemy, {
+        attackerId: source.instanceId,
+        defenderId: target.instanceId,
+        attackerSide: side,
+        defenderSide,
+        hitIds: [target.instanceId],
+        log: shieldMessage,
+        progress: "战斗开始",
+        delay: BATTLE_HIT_DELAY_MS,
+      })
+    );
   }
 }
 
@@ -1391,22 +1696,69 @@ function applyDamage(target, amount) {
   return "damaged";
 }
 
-function cleanupBoard(board, sideLabel, logs) {
-  for (let index = 0; index < board.length; ) {
-    const minion = board[index];
-    if (minion.health > 0) {
-      index += 1;
-      continue;
-    }
+function cleanupBattlefield(player, enemy, logs, frames, progress) {
+  removeDefeatedMinions(player, enemy, "player");
+  removeDefeatedMinions(enemy, player, "enemy");
 
-    const summons = buildDeathrattleSummons(board, minion);
-    board.splice(index, 1, ...summons);
-    logs.push(`${sideLabel} ${minion.name} 阵亡。`);
-    if (summons.length) {
-      logs.push(`${sideLabel} ${minion.name} 的亡语生效，召唤了 ${summons.length} 个单位。`);
+  function removeDefeatedMinions(board, opposingBoard, side) {
+    for (let index = 0; index < board.length; ) {
+      const minion = board[index];
+      if (minion.health > 0) {
+        index += 1;
+        continue;
+      }
+
+      const sideLabel = getSideLabel(side);
+      const deathMessage = `${sideLabel} ${minion.name} 阵亡。`;
+      logs.push(deathMessage);
+      frames.push(
+        createBattleFrame(player, enemy, {
+          defeatedIds: [minion.instanceId],
+          log: deathMessage,
+          progress,
+          delay: BATTLE_CLEANUP_DELAY_MS,
+        })
+      );
+
+      const summons = buildDeathrattleSummons(board, minion);
+      board.splice(index, 1, ...summons);
+      frames.push(
+        createBattleFrame(player, enemy, {
+          progress,
+          delay: BATTLE_CLEANUP_DELAY_MS,
+        })
+      );
+
+      if (summons.length) {
+        const summonMessage = `${sideLabel} ${minion.name} 的亡语生效，召唤了 ${summons.length} 个单位。`;
+        logs.push(summonMessage);
+        frames.push(
+          createBattleFrame(player, enemy, {
+            log: summonMessage,
+            progress,
+            delay: BATTLE_CLEANUP_DELAY_MS,
+          })
+        );
+      }
+      index += summons.length;
     }
-    index += summons.length;
   }
+}
+
+function createBattleFrame(player, enemy, options = {}) {
+  return {
+    playerBoard: player.map(copyMinion),
+    enemyBoard: enemy.map(copyMinion),
+    attackerId: options.attackerId ?? null,
+    defenderId: options.defenderId ?? null,
+    attackerSide: options.attackerSide ?? "",
+    defenderSide: options.defenderSide ?? "",
+    hitIds: options.hitIds ? [...options.hitIds] : [],
+    defeatedIds: options.defeatedIds ? [...options.defeatedIds] : [],
+    log: options.log ?? "",
+    progress: options.progress ?? "战斗中",
+    delay: options.delay ?? BATTLE_ACTION_DELAY_MS,
+  };
 }
 
 function buildDeathrattleSummons(board, minion) {

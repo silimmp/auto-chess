@@ -93,7 +93,7 @@
 
       <section id="battle-view" class="battle-overlay hidden">
         <div class="battle-overlay-panel">
-          <div class="battle-stage battle-stage-full">
+          <div class="battle-stage">
             <div class="battle-arena battle-arena-full">
               <div class="battle-side">
                 <div class="battle-side-label">对手战队</div>
@@ -105,6 +105,16 @@
                 <div id="battle-player-board" class="card-row battle-board"></div>
               </div>
             </div>
+            <aside class="log-panel">
+              <div class="battle-topbar">
+                <div>
+                  <div class="battle-topbar-label">战斗记录</div>
+                  <p id="battle-summary" class="panel-note">战斗尚未开始。</p>
+                </div>
+                <div id="battle-progress" class="battle-progress">等待开战</div>
+              </div>
+              <div id="combat-log" class="combat-log"></div>
+            </aside>
           </div>
         </div>
       </section>
