@@ -547,6 +547,18 @@ function buildMinionCard(minion, options = {}) {
   `;
 
   const infoButton = card.querySelector(".card-info-toggle");
+  const closeInfoOverlay = () => {
+    card.classList.remove("info-open");
+  };
+
+  infoButton?.addEventListener("mouseenter", () => {
+    card.classList.add("info-open");
+  });
+  infoButton?.addEventListener("focus", () => {
+    card.classList.add("info-open");
+  });
+  infoButton?.addEventListener("blur", closeInfoOverlay);
+  card.addEventListener("mouseleave", closeInfoOverlay);
   infoButton?.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
