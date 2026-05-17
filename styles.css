@@ -760,6 +760,10 @@ body {
     linear-gradient(135deg, rgba(201, 150, 45, 0.14), rgba(0, 0, 0, 0));
 }
 
+.minion-main:has(.card-info-toggle:hover) .minion-info-overlay,
+.minion-main:has(.card-info-toggle:focus) .minion-info-overlay,
+.minion-main:has(.minion-info-overlay:hover) .minion-info-overlay,
+.minion-card:focus-within .minion-info-overlay,
 .minion-card.info-open .minion-info-overlay {
   opacity: 1;
   pointer-events: auto;
