@@ -367,9 +367,7 @@ function renderHand() {
 
   const actionsLocked = state.phase !== "prep" || state.hp <= 0;
   state.hand.forEach((minion, index) => {
-    const card = buildMinionCard(minion);
-    const actions = card.querySelector(".card-actions");
-    actions.appendChild(makeMiniButton("出售（1 金）", () => sellMinionFromZone("hand", index), actionsLocked, "soft"));
+    const card = buildMinionCard(minion, { showActions: false });
     bindPrepCardInteractions(card, "hand", index, actionsLocked);
     elements.hand.appendChild(card);
   });
@@ -385,9 +383,7 @@ function renderPlayerBoard() {
 
   const actionsLocked = state.phase !== "prep" || state.hp <= 0;
   state.board.forEach((minion, index) => {
-    const card = buildMinionCard(minion);
-    const actions = card.querySelector(".card-actions");
-    actions.appendChild(makeMiniButton("出售（1 金）", () => sellMinionFromZone("board", index), actionsLocked, "soft"));
+    const card = buildMinionCard(minion, { showActions: false });
     bindPrepCardInteractions(card, "board", index, actionsLocked);
     elements.board.appendChild(card);
   });
@@ -665,8 +661,7 @@ function updateDragPreviewPosition(clientX, clientY) {
 }
 
 function updateDropTargetState(clientX, clientY) {
-  const hoveredZone =
-    dragState.sourceZone === "shop" ? getShopPurchaseZone() : getDropZoneAtPoint(clientX, clientY);
+  const hoveredZone = getPriorityDropZone(clientX, clientY);
   const zone = isValidDropZone(dragState.sourceZone, hoveredZone) ? hoveredZone : "";
   const index = zone === "hand" || zone === "board" ? getDropIndex(zone, clientX) : -1;
 
@@ -676,6 +671,7 @@ function updateDropTargetState(clientX, clientY) {
   Object.entries(prepZones).forEach(([key, element]) => {
     element?.classList.toggle("drop-target", key === zone);
   });
+  elements.prepPanel?.classList.toggle("sell-armed", zone === "sell");
 }
 
 function getShopPurchaseZone() {
@@ -729,6 +725,24 @@ function getOverlapRatio(sourceRect, targetRect) {
   return sourceArea > 0 ? overlapArea / sourceArea : 0;
 }
 
+function getPriorityDropZone(clientX, clientY) {
+  if (dragState.sourceZone !== "shop" && isSellDropActive()) {
+    return "sell";
+  }
+
+  return dragState.sourceZone === "shop" ? getShopPurchaseZone() : getDropZoneAtPoint(clientX, clientY);
+}
+
+function isSellDropActive() {
+  const dragRect = getActiveDragRect();
+  const prepPanelRect = elements.prepPanel?.getBoundingClientRect();
+  if (!dragRect || !prepPanelRect) {
+    return false;
+  }
+
+  return dragRect.top < prepPanelRect.top;
+}
+
 function isValidDropZone(sourceZone, targetZone) {
   if (!targetZone) {
     return false;
@@ -737,10 +751,10 @@ function isValidDropZone(sourceZone, targetZone) {
     return targetZone === "hand" || targetZone === "board";
   }
   if (sourceZone === "hand") {
-    return targetZone === "hand" || targetZone === "board";
+    return targetZone === "hand" || targetZone === "board" || targetZone === "sell";
   }
   if (sourceZone === "board") {
-    return targetZone === "board";
+    return targetZone === "board" || targetZone === "sell";
   }
   return false;
 }
@@ -801,6 +815,10 @@ function applyCardDrop({ sourceZone, sourceIndex, targetZone, targetIndex }) {
   }
 
   if (sourceZone === "hand") {
+    if (targetZone === "sell") {
+      sellMinionFromZone("hand", sourceIndex);
+      return;
+    }
     if (targetZone === "board") {
       playMinion(sourceIndex, targetIndex);
       return;
@@ -811,8 +829,14 @@ function applyCardDrop({ sourceZone, sourceIndex, targetZone, targetIndex }) {
     return;
   }
 
-  if (sourceZone === "board" && targetZone === "board") {
-    moveBoardMinion(sourceIndex, targetIndex);
+  if (sourceZone === "board") {
+    if (targetZone === "sell") {
+      sellMinionFromZone("board", sourceIndex);
+      return;
+    }
+    if (targetZone === "board") {
+      moveBoardMinion(sourceIndex, targetIndex);
+    }
   }
 }
 
@@ -832,6 +856,7 @@ function cleanupDragState() {
   dragState.sourceElement?.classList.remove("drag-source");
   dragState.previewElement?.remove();
   Object.values(prepZones).forEach((element) => element?.classList.remove("drop-target"));
+  elements.prepPanel?.classList.remove("sell-armed");
   document.body.classList.remove("dragging-card");
   dragState = createDragState();
 }

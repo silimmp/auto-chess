@@ -216,12 +216,25 @@ body {
 
 .prep-panel {
   min-height: 0;
+  position: relative;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   align-content: start;
   gap: 12px;
   padding-top: 10px;
   padding-bottom: 12px;
+}
+
+.prep-panel.sell-armed::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(154, 45, 34, 0.92), rgba(217, 116, 58, 0.92));
+  box-shadow: 0 0 0 1px rgba(255, 239, 214, 0.38), 0 0 22px rgba(172, 63, 24, 0.28);
 }
 
 .prep-zone {
