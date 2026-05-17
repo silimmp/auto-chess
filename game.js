@@ -1163,8 +1163,8 @@ function endTurnAndBattle(trigger = "manual") {
 
   state.lastBattle = {
     summary: `${intro}${result.summary}`,
-    playerSnapshot: result.remainingPlayer,
-    enemySnapshot: result.remainingEnemy,
+    playerSnapshot: state.board.map(copyMinion),
+    enemySnapshot: state.enemyBoard.map(copyMinion),
     winner: result.winner,
   };
 
