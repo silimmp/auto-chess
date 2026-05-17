@@ -254,6 +254,7 @@ body {
 }
 
 .prep-shop-zone {
+  position: relative;
   grid-template-rows: auto minmax(0, 1fr);
 }
 
@@ -279,13 +280,7 @@ body {
   align-items: flex-start;
   gap: 14px;
   margin-bottom: 0;
-}
-
-.shop-toolbar-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 22px;
-  min-width: 0;
+  min-height: 84px;
 }
 
 .panel-head.compact {
@@ -342,16 +337,18 @@ body {
   gap: 8px;
   flex-wrap: wrap;
   justify-self: end;
-  align-self: flex-start;
+  align-self: start;
 }
 
 .compact-countdown {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  width: min(100%, 176px);
-  margin-top: 2px;
-  padding: 8px 12px 9px;
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 160px);
+  padding: 7px 11px 8px;
   text-align: center;
+  z-index: 1;
 }
 
 .compact-countdown .panel-kicker {
@@ -360,14 +357,14 @@ body {
 }
 
 .compact-countdown .timer-value {
-  margin-top: 4px;
-  font-size: clamp(22px, 2.4vw, 32px);
+  margin-top: 3px;
+  font-size: clamp(20px, 2.1vw, 28px);
   line-height: 0.92;
 }
 
 .compact-countdown .timer-note {
-  margin-top: 3px;
-  font-size: 10px;
+  margin-top: 2px;
+  font-size: 9px;
   line-height: 1.2;
 }
 
@@ -1185,14 +1182,8 @@ body {
 
   .shop-toolbar {
     flex-direction: column;
+    min-height: 0;
     gap: 10px;
-  }
-
-  .shop-toolbar-main {
-    width: 100%;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 12px;
   }
 
   .shop-title {
@@ -1203,8 +1194,10 @@ body {
   }
 
   .compact-countdown {
-    width: min(100%, 200px);
-    margin-top: 0;
+    position: static;
+    justify-self: center;
+    width: min(100%, 180px);
+    transform: none;
   }
 
   .top-actions {
