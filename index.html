@@ -43,12 +43,6 @@
           </div>
         </section>
 
-        <section id="timer-card" class="hud-panel countdown-card">
-          <div class="panel-kicker">倒计时</div>
-          <strong id="timer-value" class="timer-value">15s</strong>
-          <p class="timer-note">时间到后自动进入战斗。</p>
-        </section>
-
         <section class="hud-panel message-panel">
           <div class="panel-kicker">当前提示</div>
           <p id="message-value" class="message-text">
@@ -72,6 +66,11 @@
                   <span aria-hidden="true">商店</span>
                 </h1>
               </div>
+              <section id="timer-card" class="countdown-card compact-countdown">
+                <div class="panel-kicker">招募倒计时</div>
+                <strong id="timer-value" class="timer-value">15s</strong>
+                <p class="timer-note">时间到后自动进入战斗。</p>
+              </section>
               <div class="top-actions">
                 <button id="upgrade-btn" class="action-btn accent">升级商店</button>
                 <button id="refresh-btn" class="action-btn">刷新</button>
