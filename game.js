@@ -901,10 +901,7 @@ function applyCardDrop({ sourceZone, sourceIndex, targetZone, targetIndex }) {
 
   if (sourceZone === "shop") {
     if (targetZone === "hand" || targetZone === "board") {
-      buyMinion(sourceIndex, {
-        destination: targetZone,
-        targetIndex,
-      });
+      buyMinion(sourceIndex);
     }
     return;
   }
@@ -999,12 +996,11 @@ function toggleFreezeShop() {
   render();
 }
 
-function buyMinion(shopIndex, options = {}) {
+function buyMinion(shopIndex) {
   if (state.phase !== "prep") {
     return;
   }
 
-  const { destination = "hand", targetIndex = -1 } = options;
   const shopMinion = state.shop[shopIndex];
   if (!shopMinion) {
     return;
@@ -1014,13 +1010,7 @@ function buyMinion(shopIndex, options = {}) {
     render();
     return;
   }
-  if (destination === "board") {
-    if (state.board.length >= BOARD_LIMIT) {
-      state.message = "战队已满，先腾个位置。";
-      render();
-      return;
-    }
-  } else if (state.hand.length >= HAND_LIMIT) {
+  if (state.hand.length >= HAND_LIMIT) {
     state.message = "手牌已满，先处理一下手牌。";
     render();
     return;
@@ -1029,19 +1019,10 @@ function buyMinion(shopIndex, options = {}) {
   state.gold -= BUY_COST;
   state.shop.splice(shopIndex, 1);
   const purchasedMinion = createOwnedMinion(shopMinion.id);
-
-  if (destination === "board") {
-    const insertIndex = normalizeInsertIndex(targetIndex, state.board.length);
-    state.board.splice(insertIndex, 0, purchasedMinion);
-  } else {
-    state.hand.push(purchasedMinion);
-  }
+  state.hand.push(purchasedMinion);
 
   const merged = resolveTriples();
-  state.message = buildRecruitMessage(
-    destination === "board" ? `买下并派出了 ${shopMinion.name}` : `买下了 ${shopMinion.name}，已置入手牌`,
-    merged
-  );
+  state.message = buildRecruitMessage(`买下了 ${shopMinion.name}，已置入手牌`, merged);
   render();
 }
 
