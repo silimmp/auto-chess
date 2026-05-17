@@ -337,8 +337,7 @@ function render() {
   elements.hp.textContent = Math.max(0, state.hp);
   elements.tier.textContent = state.tavernTier;
   elements.phase.textContent = getPhaseLabel(state.phase);
-  elements.timer.textContent = isPrep ? `${state.timeLeft}s` : state.phase === "gameOver" ? "结束" : "战斗中";
-  elements.timerCard.classList.toggle("urgent", isPrep && state.timeLeft <= 5);
+  syncTimerDisplay();
   elements.message.textContent = state.message;
   elements.battleView.classList.toggle("hidden", isPrep);
 
@@ -350,6 +349,12 @@ function render() {
 
   renderBattleBoards();
   syncButtons();
+}
+
+function syncTimerDisplay() {
+  const isPrep = state.phase === "prep";
+  elements.timer.textContent = isPrep ? `${state.timeLeft}s` : state.phase === "gameOver" ? "结束" : "战斗中";
+  elements.timerCard.classList.toggle("urgent", isPrep && state.timeLeft <= 5);
 }
 
 function syncButtons() {
@@ -1218,7 +1223,7 @@ function updatePrepCountdown() {
   const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
   if (remainingSeconds !== state.timeLeft) {
     state.timeLeft = remainingSeconds;
-    render();
+    syncTimerDisplay();
   }
   if (remainingMs <= 0) {
     endTurnAndBattle("timer");
