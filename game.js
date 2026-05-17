@@ -11,8 +11,9 @@ const BATTLE_INTRO_DELAY_MS = 450;
 const BATTLE_ACTION_DELAY_MS = 620;
 const BATTLE_HIT_DELAY_MS = 420;
 const BATTLE_CLEANUP_DELAY_MS = 320;
-const LONG_PRESS_MS = 140;
-const DRAG_CANCEL_DISTANCE = 24;
+const TOUCH_LONG_PRESS_MS = 110;
+const POINTER_DRAG_START_DISTANCE = 8;
+const TOUCH_DRAG_CANCEL_DISTANCE = 18;
 
 const UPGRADE_COSTS = {
   1: 5,
@@ -302,6 +303,7 @@ function createDragState() {
     sourceIndex: -1,
     sourceElement: null,
     previewElement: null,
+    pointerType: "",
     startX: 0,
     startY: 0,
     pointerX: 0,
@@ -640,6 +642,7 @@ function beginCardDragPress(event, zone, index, card) {
     ...createDragState(),
     status: "pending",
     pointerId: event.pointerId,
+    pointerType: event.pointerType || "mouse",
     sourceZone: zone,
     sourceIndex: index,
     sourceElement: card,
@@ -649,9 +652,11 @@ function beginCardDragPress(event, zone, index, card) {
     pointerY: event.clientY,
   };
 
-  dragState.timerId = window.setTimeout(() => {
-    activateDrag();
-  }, LONG_PRESS_MS);
+  if (requiresLongPressDrag(dragState.pointerType)) {
+    dragState.timerId = window.setTimeout(() => {
+      activateDrag();
+    }, TOUCH_LONG_PRESS_MS);
+  }
 }
 
 function handleGlobalPointerMove(event) {
@@ -664,15 +669,26 @@ function handleGlobalPointerMove(event) {
 
   if (dragState.status === "pending") {
     const distance = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
-    if (distance > DRAG_CANCEL_DISTANCE) {
+    if (!requiresLongPressDrag(dragState.pointerType) && distance >= POINTER_DRAG_START_DISTANCE) {
+      activateDrag();
+      if (dragState.status !== "active") {
+        return;
+      }
+    } else if (requiresLongPressDrag(dragState.pointerType) && distance > TOUCH_DRAG_CANCEL_DISTANCE) {
       cancelDragInteraction();
+      return;
+    } else {
+      return;
     }
-    return;
   }
 
   event.preventDefault();
   updateDragPreviewPosition(event.clientX, event.clientY);
   updateDropTargetState(event.clientX, event.clientY);
+}
+
+function requiresLongPressDrag(pointerType) {
+  return pointerType === "touch";
 }
 
 function handleGlobalPointerUp(event) {
@@ -746,6 +762,11 @@ function updateDropTargetState(clientX, clientY) {
 }
 
 function getShopPurchaseZone() {
+  const pointerZone = getDropZoneAtPoint(dragState.pointerX, dragState.pointerY);
+  if (pointerZone === "hand" || pointerZone === "board") {
+    return pointerZone;
+  }
+
   const dragRect = getActiveDragRect();
   if (!dragRect) {
     return "";
@@ -754,10 +775,10 @@ function getShopPurchaseZone() {
   const handRatio = getOverlapRatio(dragRect, prepZones.hand?.getBoundingClientRect());
   const boardRatio = getOverlapRatio(dragRect, prepZones.board?.getBoundingClientRect());
 
-  if (boardRatio >= 0.5 && boardRatio >= handRatio) {
+  if (boardRatio >= 0.28 && boardRatio >= handRatio) {
     return "board";
   }
-  if (handRatio >= 0.5) {
+  if (handRatio >= 0.28) {
     return "hand";
   }
   return "";
@@ -880,7 +901,10 @@ function applyCardDrop({ sourceZone, sourceIndex, targetZone, targetIndex }) {
 
   if (sourceZone === "shop") {
     if (targetZone === "hand" || targetZone === "board") {
-      buyMinion(sourceIndex);
+      buyMinion(sourceIndex, {
+        destination: targetZone,
+        targetIndex,
+      });
     }
     return;
   }
@@ -975,11 +999,12 @@ function toggleFreezeShop() {
   render();
 }
 
-function buyMinion(shopIndex) {
+function buyMinion(shopIndex, options = {}) {
   if (state.phase !== "prep") {
     return;
   }
 
+  const { destination = "hand", targetIndex = -1 } = options;
   const shopMinion = state.shop[shopIndex];
   if (!shopMinion) {
     return;
@@ -989,7 +1014,13 @@ function buyMinion(shopIndex) {
     render();
     return;
   }
-  if (state.hand.length >= HAND_LIMIT) {
+  if (destination === "board") {
+    if (state.board.length >= BOARD_LIMIT) {
+      state.message = "战队已满，先腾个位置。";
+      render();
+      return;
+    }
+  } else if (state.hand.length >= HAND_LIMIT) {
     state.message = "手牌已满，先处理一下手牌。";
     render();
     return;
@@ -998,10 +1029,19 @@ function buyMinion(shopIndex) {
   state.gold -= BUY_COST;
   state.shop.splice(shopIndex, 1);
   const purchasedMinion = createOwnedMinion(shopMinion.id);
-  state.hand.push(purchasedMinion);
+
+  if (destination === "board") {
+    const insertIndex = normalizeInsertIndex(targetIndex, state.board.length);
+    state.board.splice(insertIndex, 0, purchasedMinion);
+  } else {
+    state.hand.push(purchasedMinion);
+  }
 
   const merged = resolveTriples();
-  state.message = buildRecruitMessage(`买下了 ${shopMinion.name}，已置入手牌`, merged);
+  state.message = buildRecruitMessage(
+    destination === "board" ? `买下并派出了 ${shopMinion.name}` : `买下了 ${shopMinion.name}，已置入手牌`,
+    merged
+  );
   render();
 }
 
