@@ -547,7 +547,7 @@ body {
   position: absolute;
   inset: 6px;
   z-index: 0;
-  border: 1px solid rgba(120, 79, 30, 0.16);
+  border: 0;
   border-radius: 14px 14px 16px 16px / 12px 12px 18px 18px;
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.22), transparent 38%),
@@ -672,16 +672,18 @@ body {
   position: relative;
 }
 
-.minion-header-side {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.minion-title-block {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
 }
 
 .minion-name {
   margin: 0;
   font-size: 13px;
   line-height: 1.12;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .hand-row .minion-name {
@@ -690,6 +692,7 @@ body {
 }
 
 .tier-badge {
+  flex: 0 0 auto;
   border-radius: 999px;
   padding: 3px 6px;
   font-size: 9px;
@@ -726,6 +729,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   position: relative;
   z-index: 5;
   width: 18px;

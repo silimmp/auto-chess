@@ -527,14 +527,12 @@ function buildMinionCard(minion, options = {}) {
     <div class="minion-main">
       ${battleTop}
       <div class="minion-header">
-        <div>
+        <span class="tier-badge">★${minion.tier}</span>
+        <div class="minion-title-block">
           <h3 class="minion-name">${minion.golden ? "金色" : ""}${minion.name}</h3>
           <div class="minion-meta">${minion.tribe}</div>
         </div>
-        <div class="minion-header-side">
-          ${infoToggle}
-          <span class="tier-badge">T${minion.tier}</span>
-        </div>
+        ${infoToggle}
       </div>
       ${descriptionBlock}
       <div class="keyword-row">${keywords}</div>
