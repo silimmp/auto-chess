@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>酒馆自走棋原型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <svg class="shape-defs" aria-hidden="true" width="0" height="0" focusable="false">
+      <defs>
+        <clipPath id="minion-shield-clip" clipPathUnits="objectBoundingBox">
+          <path d="M0.18,0 H0.82 C0.92,0 1,0.08 1,0.18 V0.58 C1,0.71 0.96,0.82 0.89,0.89 C0.81,0.96 0.69,1 0.5,1 C0.31,1 0.19,0.96 0.11,0.89 C0.04,0.82 0,0.71 0,0.58 V0.18 C0,0.08 0.08,0 0.18,0 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <div class="game-shell">
+      <aside class="hud-column">
+        <section class="hud-panel stat-panel">
+          <div class="panel-kicker">对局信息</div>
+          <div class="stat-grid">
+            <article class="status-card">
+              <span>回合</span>
+              <strong id="turn-value">1</strong>
+            </article>
+            <article class="status-card">
+              <span>金币</span>
+              <strong id="gold-value">3</strong>
+            </article>
+            <article class="status-card">
+              <span>生命</span>
+              <strong id="hp-value">30</strong>
+            </article>
+            <article class="status-card">
+              <span>商店</span>
+              <strong id="tier-value">1</strong>
+            </article>
+          </div>
+          <div class="phase-chip">
+            <span>阶段</span>
+            <strong id="phase-value">准备中</strong>
+          </div>
+        </section>
+
+        <section id="timer-card" class="hud-panel countdown-card">
+          <div class="panel-kicker">倒计时</div>
+          <strong id="timer-value" class="timer-value">15s</strong>
+          <p class="timer-note">时间到后自动进入战斗。</p>
+        </section>
+
+        <section class="hud-panel message-panel">
+          <div class="panel-kicker">当前提示</div>
+          <p id="message-value" class="message-text">
+            先从商店购买随从，放入手牌后再决定是否上场。
+          </p>
+        </section>
+
+        <section class="hud-actions">
+          <button id="battle-btn" class="action-btn danger">提前开战</button>
+          <button id="reset-btn" class="action-btn ghost">重新开始</button>
+        </section>
+      </aside>
+
+      <main id="prep-view" class="game-stage">
+        <section class="panel prep-panel">
+          <div class="prep-zone prep-shop-zone">
+            <div class="shop-toolbar">
+              <div class="shop-title">
+                <h1 aria-label="随从商店">
+                  <span aria-hidden="true">随从</span>
+                  <span aria-hidden="true">商店</span>
+                </h1>
+              </div>
+              <div class="top-actions">
+                <button id="upgrade-btn" class="action-btn accent">升级商店</button>
+                <button id="refresh-btn" class="action-btn">刷新</button>
+                <button id="freeze-btn" class="action-btn ghost">冻结</button>
+              </div>
+            </div>
+            <div id="shop-board" class="card-row shop-row"></div>
+          </div>
+
+          <div class="prep-zone prep-board-zone">
+            <div id="player-board" class="card-row board-row"></div>
+          </div>
+
+          <div class="prep-zone prep-hand-zone">
+            <div id="hand-board" class="card-row hand-row"></div>
+          </div>
+        </section>
+      </main>
+
+      <section id="battle-view" class="battle-overlay hidden">
+        <div class="battle-overlay-panel">
+          <div class="battle-stage battle-stage-full">
+            <div class="battle-arena battle-arena-full">
+              <div class="battle-side">
+                <div class="battle-side-label">对手战队</div>
+                <div id="battle-enemy-board" class="card-row battle-board"></div>
+              </div>
+              <div class="versus-banner">VS</div>
+              <div class="battle-side">
+                <div class="battle-side-label">你的战队</div>
+                <div id="battle-player-board" class="card-row battle-board"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="./game.js"></script>
+  </body>
+</html>
