@@ -221,9 +221,6 @@ const elements = {
   battleView: document.querySelector("#battle-view"),
   battleEnemy: document.querySelector("#battle-enemy-board"),
   battlePlayer: document.querySelector("#battle-player-board"),
-  battleSummary: document.querySelector("#battle-summary"),
-  battleProgress: document.querySelector("#battle-progress"),
-  combatLog: document.querySelector("#combat-log"),
   refreshBtn: document.querySelector("#refresh-btn"),
   upgradeBtn: document.querySelector("#upgrade-btn"),
   freezeBtn: document.querySelector("#freeze-btn"),
@@ -441,7 +438,6 @@ function renderBattleBoards() {
     playerSnapshot,
     "你的战队会在战斗阶段显示在这里。"
   );
-  renderBattleLog();
 }
 
 function renderBattleLane(container, minions, emptyText) {
@@ -576,47 +572,6 @@ function getBattleVisualState(minion, side) {
     roleLabel: isAttacker ? "进攻" : isDefender ? "受击" : "",
     roleClass: isAttacker ? "attacker" : isDefender ? "defender" : "",
   };
-}
-
-function renderBattleLog() {
-  if (elements.battleSummary) {
-    elements.battleSummary.textContent = state.lastBattle.summary;
-  }
-  if (elements.battleProgress) {
-    elements.battleProgress.textContent =
-      state.phase === "battle" && state.battleAnimation.active
-        ? state.battleAnimation.progressLabel
-        : state.phase === "prep"
-          ? "等待开战"
-          : "战斗结束";
-  }
-  if (!elements.combatLog) {
-    return;
-  }
-
-  const logLines =
-    state.phase === "battle" && state.battleAnimation.active
-      ? state.battleAnimation.logLines
-      : state.lastBattle.logs;
-
-  elements.combatLog.innerHTML = "";
-
-  if (!logLines.length) {
-    const line = document.createElement("div");
-    line.className = "log-line";
-    line.textContent = state.phase === "prep" ? "战斗记录会在开战后依次显示。" : "这场战斗没有产生可展示的战斗记录。";
-    elements.combatLog.appendChild(line);
-    return;
-  }
-
-  logLines.forEach((text) => {
-    const line = document.createElement("div");
-    line.className = "log-line";
-    line.textContent = text;
-    elements.combatLog.appendChild(line);
-  });
-
-  elements.combatLog.scrollTop = elements.combatLog.scrollHeight;
 }
 
 function makeMiniButton(label, onClick, disabled, variant = "alt") {

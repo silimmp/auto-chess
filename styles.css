@@ -291,7 +291,6 @@ body {
 
 .shop-title h1,
 .panel h2,
-.log-panel h3,
 .battle-hero h2 {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
@@ -324,10 +323,6 @@ body {
 
 .panel h2 {
   font-size: 26px;
-}
-
-.log-panel h3 {
-  font-size: 18px;
 }
 
 .top-actions {
@@ -917,18 +912,9 @@ body {
   font-weight: 700;
 }
 
-.battle-progress {
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 244, 220, 0.88);
-  background: rgba(255, 255, 255, 0.1);
-}
-
 .battle-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  grid-template-columns: 1fr;
   gap: 18px;
   min-height: 0;
 }
@@ -938,8 +924,7 @@ body {
   height: 100%;
 }
 
-.battle-arena,
-.log-panel {
+.battle-arena {
   min-height: 0;
   border-radius: 24px;
 }
@@ -992,48 +977,6 @@ body {
     radial-gradient(circle at top, rgba(255, 232, 170, 0.32), transparent 48%),
     linear-gradient(180deg, #9d6d18, #6d4512);
   box-shadow: 0 10px 24px rgba(74, 44, 13, 0.28);
-}
-
-.log-panel {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  padding: 18px;
-  background: rgba(255, 248, 232, 0.1);
-  border: 1px solid rgba(255, 235, 190, 0.12);
-}
-
-.log-panel .panel-note,
-.log-panel h3 {
-  color: #fff4db;
-}
-
-.log-panel .panel-note {
-  margin: 6px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: rgba(255, 236, 196, 0.88);
-}
-
-.combat-log {
-  display: grid;
-  gap: 8px;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 6px;
-}
-
-.log-line {
-  border-left: 4px solid rgba(201, 150, 45, 0.56);
-  padding: 10px 12px;
-  border-radius: 0 12px 12px 0;
-  background: rgba(255, 250, 238, 0.92);
-  color: var(--ink);
-  line-height: 1.45;
-}
-
-.battle-footer {
-  display: flex;
-  justify-content: flex-end;
 }
 
 @keyframes battlePulse {
