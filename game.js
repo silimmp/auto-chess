@@ -26,6 +26,16 @@ const UPGRADE_COSTS = {
 };
 
 const MINION_ABILITY_FIELDS = ["deathrattle", "combatStart"];
+const SHOP_SLOTS = 5;
+const CONTENT_TIER_CAP = 3;
+
+const ENEMY_BOARD_RULES = {
+  tierCap: CONTENT_TIER_CAP,
+  extraSizeTurnThreshold: 3,
+  extraSizeRollMax: 1,
+};
+
+const COMBAT_START_PROGRESS_LABEL = "战斗开始";
 
 const MINION_POOL = [
   {
@@ -1397,14 +1407,14 @@ function startNextTurn() {
 }
 
 function generateShop(maxTier) {
-  const effectiveTier = Math.min(maxTier, 3);
+  const effectiveTier = Math.min(maxTier, CONTENT_TIER_CAP);
   const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier <= effectiveTier);
-  return Array.from({ length: 5 }, () => cloneTemplate(pickRandom(candidates)));
+  return Array.from({ length: SHOP_SLOTS }, () => cloneTemplate(pickRandom(candidates)));
 }
 
 function refillShop(currentShop, maxTier) {
   const filledShop = currentShop.map(cloneTemplate);
-  const missing = Math.max(0, 5 - filledShop.length);
+  const missing = Math.max(0, SHOP_SLOTS - filledShop.length);
   if (missing === 0) {
     return filledShop;
   }
@@ -1412,9 +1422,15 @@ function refillShop(currentShop, maxTier) {
 }
 
 function generateEnemyBoard(turn) {
-  const enemyTier = Math.min(Math.min(MAX_TAVERN_TIER, 3), 1 + Math.floor((turn - 1) / 2));
+  const enemyTier = Math.min(Math.min(MAX_TAVERN_TIER, ENEMY_BOARD_RULES.tierCap), 1 + Math.floor((turn - 1) / 2));
   const baseSize = Math.min(BOARD_LIMIT, 1 + Math.floor((turn - 1) / 2));
-  const size = Math.min(BOARD_LIMIT, baseSize + (turn >= 3 ? randomInt(0, 1) : 0));
+  const size = Math.min(
+    BOARD_LIMIT,
+    baseSize +
+      (turn >= ENEMY_BOARD_RULES.extraSizeTurnThreshold
+        ? randomInt(0, ENEMY_BOARD_RULES.extraSizeRollMax)
+        : 0)
+  );
   const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier <= enemyTier);
   const board = [];
 
@@ -1529,23 +1545,52 @@ function simulateBattle(playerBoard, enemyBoard) {
 }
 
 function resolveCombatStartEffects(player, enemy, logs, frames) {
-  const playerEntries = player.filter((minion) => minion.combatStart);
-  const enemyEntries = enemy.filter((minion) => minion.combatStart);
+  runCombatStartAbilities(player, "player", enemy, player, enemy, logs, frames);
+  runCombatStartAbilities(enemy, "enemy", player, player, enemy, logs, frames);
+  cleanupBattlefield(player, enemy, logs, frames, COMBAT_START_PROGRESS_LABEL);
+}
 
-  playerEntries.forEach((minion) => applyCombatStartAbility(minion, "player", enemy, player, enemy, logs, frames));
-  enemyEntries.forEach((minion) => applyCombatStartAbility(minion, "enemy", player, player, enemy, logs, frames));
-
-  cleanupBattlefield(player, enemy, logs, frames, "战斗开始");
+function runCombatStartAbilities(sources, side, targets, player, enemy, logs, frames) {
+  sources
+    .filter((minion) => minion.combatStart)
+    .forEach((minion) => applyCombatStartAbility(minion, side, targets, player, enemy, logs, frames));
 }
 
 function applyCombatStartAbility(source, side, targets, player, enemy, logs, frames) {
-  if (!source.combatStart || source.combatStart.type !== "deal-random-damage") {
-    return;
+  if (!source.combatStart) {
+    return false;
   }
 
+  const context = {
+    source,
+    side,
+    targets,
+    player,
+    enemy,
+    logs,
+    frames,
+    progress: COMBAT_START_PROGRESS_LABEL,
+  };
+
+  return resolveCombatStartAbility(context);
+}
+
+function resolveCombatStartAbility(context) {
+  const handlers = {
+    "deal-random-damage": resolveDealRandomDamageCombatStart,
+  };
+  const handler = handlers[context.source.combatStart.type];
+  if (!handler) {
+    return false;
+  }
+  return handler(context);
+}
+
+function resolveDealRandomDamageCombatStart(context) {
+  const { source, side, targets, player, enemy, logs, frames, progress } = context;
   const livingTargets = targets.filter((minion) => minion.health > 0);
   if (!livingTargets.length) {
-    return;
+    return false;
   }
 
   const target = pickRandom(livingTargets);
@@ -1557,7 +1602,7 @@ function applyCombatStartAbility(source, side, targets, player, enemy, logs, fra
     defenderId: target.instanceId,
     attackerSide: side,
     defenderSide,
-    progress: "战斗开始",
+    progress,
     delay: BATTLE_ACTION_DELAY_MS,
   });
   const note = applyDamage(target, amount);
@@ -1567,7 +1612,7 @@ function applyCombatStartAbility(source, side, targets, player, enemy, logs, fra
     attackerSide: side,
     defenderSide,
     hitIds: [target.instanceId],
-    progress: "战斗开始",
+    progress,
     delay: BATTLE_HIT_DELAY_MS,
   });
   recordShieldBreak(note, target, player, enemy, logs, frames, {
@@ -1575,8 +1620,9 @@ function applyCombatStartAbility(source, side, targets, player, enemy, logs, fra
     defenderId: target.instanceId,
     attackerSide: side,
     defenderSide,
-    progress: "战斗开始",
+    progress,
   });
+  return true;
 }
 
 function chooseStartingSide(player, enemy) {
