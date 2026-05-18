@@ -25,6 +25,8 @@ const UPGRADE_COSTS = {
   7: null,
 };
 
+const MINION_ABILITY_FIELDS = ["deathrattle", "combatStart"];
+
 const MINION_POOL = [
   {
     id: "alley-cat",
@@ -52,7 +54,7 @@ const MINION_POOL = [
     id: "murloc-scout",
     name: "恶魔斥候",
     tier: 1,
-    tribe: "炼狱",
+    tribe: "恶魔",
     attack: 2,
     health: 1,
     keywords: [],
@@ -72,7 +74,7 @@ const MINION_POOL = [
     id: "taunt-guard",
     name: "人类守卫",
     tier: 1,
-    tribe: "帝国",
+    tribe: "人类",
     attack: 2,
     health: 3,
     keywords: ["taunt"],
@@ -82,7 +84,7 @@ const MINION_POOL = [
     id: "rat-pack",
     name: "亡灵鼠群",
     tier: 2,
-    tribe: "亡骸",
+    tribe: "亡灵",
     attack: 2,
     health: 2,
     keywords: ["deathrattle"],
@@ -93,7 +95,7 @@ const MINION_POOL = [
     id: "rat-token",
     name: "亡灵老鼠",
     tier: 1,
-    tribe: "亡骸",
+    tribe: "亡灵",
     attack: 1,
     health: 1,
     keywords: [],
@@ -146,7 +148,7 @@ const MINION_POOL = [
     id: "retired-veteran",
     name: "退役老兵",
     tier: 2,
-    tribe: "帝国",
+    tribe: "人类",
     attack: 4,
     health: 4,
     keywords: ["provoke"],
@@ -167,7 +169,7 @@ const MINION_POOL = [
     id: "arena-champion",
     name: "兽人统领",
     tier: 3,
-    tribe: "蛮荒",
+    tribe: "兽人",
     attack: 5,
     health: 4,
     keywords: [],
@@ -187,7 +189,7 @@ const MINION_POOL = [
     id: "dire-guardian",
     name: "人类守备官",
     tier: 3,
-    tribe: "帝国",
+    tribe: "人类",
     attack: 4,
     health: 5,
     keywords: ["taunt"],
@@ -1460,65 +1462,42 @@ function simulateBattle(playerBoard, enemyBoard) {
     const progress = `第 ${exchange} 次交锋`;
     const attackMessage = `${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。`;
 
-    logs.push(attackMessage);
-    frames.push(
-      createBattleFrame(player, enemy, {
-        attackerId: attacker.instanceId,
-        defenderId: defender.instanceId,
-        attackerSide,
-        defenderSide: attackerSide === "player" ? "enemy" : "player",
-        log: attackMessage,
-        progress,
-        delay: BATTLE_ACTION_DELAY_MS,
-      })
-    );
+    const defenderSide = attackerSide === "player" ? "enemy" : "player";
+    pushBattleLogFrame(player, enemy, logs, frames, attackMessage, {
+      attackerId: attacker.instanceId,
+      defenderId: defender.instanceId,
+      attackerSide,
+      defenderSide,
+      progress,
+      delay: BATTLE_ACTION_DELAY_MS,
+    });
 
     const attackerDamageNote = applyDamage(attacker, defender.attack);
     const defenderDamageNote = applyDamage(defender, attacker.attack);
-    frames.push(
-      createBattleFrame(player, enemy, {
-        attackerId: attacker.instanceId,
-        defenderId: defender.instanceId,
-        attackerSide,
-        defenderSide: attackerSide === "player" ? "enemy" : "player",
-        hitIds: [attacker.instanceId, defender.instanceId],
-        progress,
-        delay: BATTLE_HIT_DELAY_MS,
-      })
-    );
+    pushBattleFrameOnly(player, enemy, frames, {
+      attackerId: attacker.instanceId,
+      defenderId: defender.instanceId,
+      attackerSide,
+      defenderSide,
+      hitIds: [attacker.instanceId, defender.instanceId],
+      progress,
+      delay: BATTLE_HIT_DELAY_MS,
+    });
 
-    if (attackerDamageNote === "shield") {
-      const message = `${attacker.name} 的圣盾被打掉了。`;
-      logs.push(message);
-      frames.push(
-        createBattleFrame(player, enemy, {
-          attackerId: attacker.instanceId,
-          defenderId: defender.instanceId,
-          attackerSide,
-          defenderSide: attackerSide === "player" ? "enemy" : "player",
-          hitIds: [attacker.instanceId],
-          log: message,
-          progress,
-          delay: BATTLE_HIT_DELAY_MS,
-        })
-      );
-    }
-    if (defenderDamageNote === "shield") {
-      const message = `${defender.name} 的圣盾被打掉了。`;
-      logs.push(message);
-      frames.push(
-        createBattleFrame(player, enemy, {
-          attackerId: attacker.instanceId,
-          defenderId: defender.instanceId,
-          attackerSide,
-          defenderSide: attackerSide === "player" ? "enemy" : "player",
-          hitIds: [defender.instanceId],
-          log: message,
-          progress,
-          delay: BATTLE_HIT_DELAY_MS,
-        })
-      );
-    }
+    recordShieldBreak(attackerDamageNote, attacker, player, enemy, logs, frames, {
+      attackerId: attacker.instanceId,
+      defenderId: defender.instanceId,
+      attackerSide,
+      defenderSide,
+      progress,
+    });
+    recordShieldBreak(defenderDamageNote, defender, player, enemy, logs, frames, {
+      attackerId: attacker.instanceId,
+      defenderId: defender.instanceId,
+      attackerSide,
+      defenderSide,
+      progress,
+    });
 
     cleanupBattlefield(player, enemy, logs, frames, progress);
 
@@ -1573,46 +1552,31 @@ function applyCombatStartAbility(source, side, targets, player, enemy, logs, fra
   const amount = source.combatStart.amount ?? 0;
   const message = `${source.name} 在战斗开始时命中 ${target.name}，造成 ${amount} 点伤害。`;
   const defenderSide = side === "player" ? "enemy" : "player";
-  logs.push(message);
-  frames.push(
-    createBattleFrame(player, enemy, {
-      attackerId: source.instanceId,
-      defenderId: target.instanceId,
-      attackerSide: side,
-      defenderSide,
-      log: message,
-      progress: "战斗开始",
-      delay: BATTLE_ACTION_DELAY_MS,
-    })
-  );
+  pushBattleLogFrame(player, enemy, logs, frames, message, {
+    attackerId: source.instanceId,
+    defenderId: target.instanceId,
+    attackerSide: side,
+    defenderSide,
+    progress: "战斗开始",
+    delay: BATTLE_ACTION_DELAY_MS,
+  });
   const note = applyDamage(target, amount);
-  frames.push(
-    createBattleFrame(player, enemy, {
-      attackerId: source.instanceId,
-      defenderId: target.instanceId,
-      attackerSide: side,
-      defenderSide,
-      hitIds: [target.instanceId],
-      progress: "战斗开始",
-      delay: BATTLE_HIT_DELAY_MS,
-    })
-  );
-  if (note === "shield") {
-    const shieldMessage = `${target.name} 的圣盾被打掉了。`;
-    logs.push(shieldMessage);
-    frames.push(
-      createBattleFrame(player, enemy, {
-        attackerId: source.instanceId,
-        defenderId: target.instanceId,
-        attackerSide: side,
-        defenderSide,
-        hitIds: [target.instanceId],
-        log: shieldMessage,
-        progress: "战斗开始",
-        delay: BATTLE_HIT_DELAY_MS,
-      })
-    );
-  }
+  pushBattleFrameOnly(player, enemy, frames, {
+    attackerId: source.instanceId,
+    defenderId: target.instanceId,
+    attackerSide: side,
+    defenderSide,
+    hitIds: [target.instanceId],
+    progress: "战斗开始",
+    delay: BATTLE_HIT_DELAY_MS,
+  });
+  recordShieldBreak(note, target, player, enemy, logs, frames, {
+    attackerId: source.instanceId,
+    defenderId: target.instanceId,
+    attackerSide: side,
+    defenderSide,
+    progress: "战斗开始",
+  });
 }
 
 function chooseStartingSide(player, enemy) {
@@ -1669,52 +1633,64 @@ function applyDamage(target, amount) {
 }
 
 function cleanupBattlefield(player, enemy, logs, frames, progress) {
-  removeDefeatedMinions(player, enemy, "player");
-  removeDefeatedMinions(enemy, player, "enemy");
+  removeDefeatedMinions(player, enemy, player, enemy, "player", logs, frames, progress);
+  removeDefeatedMinions(enemy, player, player, enemy, "enemy", logs, frames, progress);
+}
 
-  function removeDefeatedMinions(board, opposingBoard, side) {
-    for (let index = 0; index < board.length; ) {
-      const minion = board[index];
-      if (minion.health > 0) {
-        index += 1;
-        continue;
-      }
-
-      const sideLabel = getSideLabel(side);
-      const deathMessage = `${sideLabel} ${minion.name} 阵亡。`;
-      logs.push(deathMessage);
-      frames.push(
-        createBattleFrame(player, enemy, {
-          defeatedIds: [minion.instanceId],
-          log: deathMessage,
-          progress,
-          delay: BATTLE_CLEANUP_DELAY_MS,
-        })
-      );
-
-      const summons = buildDeathrattleSummons(board, minion);
-      board.splice(index, 1, ...summons);
-      frames.push(
-        createBattleFrame(player, enemy, {
-          progress,
-          delay: BATTLE_CLEANUP_DELAY_MS,
-        })
-      );
-
-      if (summons.length) {
-        const summonMessage = `${sideLabel} ${minion.name} 的亡语生效，召唤了 ${summons.length} 个单位。`;
-        logs.push(summonMessage);
-        frames.push(
-          createBattleFrame(player, enemy, {
-            log: summonMessage,
-            progress,
-            delay: BATTLE_CLEANUP_DELAY_MS,
-          })
-        );
-      }
-      index += summons.length;
+function removeDefeatedMinions(board, opposingBoard, player, enemy, side, logs, frames, progress) {
+  for (let index = 0; index < board.length; ) {
+    const minion = board[index];
+    if (minion.health > 0) {
+      index += 1;
+      continue;
     }
+
+    const sideLabel = getSideLabel(side);
+    const deathMessage = `${sideLabel} ${minion.name} 阵亡。`;
+    pushBattleLogFrame(player, enemy, logs, frames, deathMessage, {
+      defeatedIds: [minion.instanceId],
+      progress,
+      delay: BATTLE_CLEANUP_DELAY_MS,
+    });
+
+    const summons = buildDeathrattleSummons(board, minion);
+    board.splice(index, 1, ...summons);
+    pushBattleFrameOnly(player, enemy, frames, {
+      progress,
+      delay: BATTLE_CLEANUP_DELAY_MS,
+    });
+
+    if (summons.length) {
+      const summonMessage = `${sideLabel} ${minion.name} 的亡语生效，召唤了 ${summons.length} 个单位。`;
+      pushBattleLogFrame(player, enemy, logs, frames, summonMessage, {
+        progress,
+        delay: BATTLE_CLEANUP_DELAY_MS,
+      });
+    }
+
+    index += summons.length;
   }
+}
+
+function pushBattleLogFrame(player, enemy, logs, frames, message, options = {}) {
+  logs.push(message);
+  pushBattleFrameOnly(player, enemy, frames, { ...options, log: message });
+}
+
+function pushBattleFrameOnly(player, enemy, frames, options = {}) {
+  frames.push(createBattleFrame(player, enemy, options));
+}
+
+function recordShieldBreak(note, target, player, enemy, logs, frames, options = {}) {
+  if (note !== "shield") {
+    return;
+  }
+
+  pushBattleLogFrame(player, enemy, logs, frames, `${target.name} 的圣盾被打掉了。`, {
+    ...options,
+    hitIds: [target.instanceId],
+    delay: BATTLE_HIT_DELAY_MS,
+  });
 }
 
 function createBattleFrame(player, enemy, options = {}) {
@@ -1760,12 +1736,7 @@ function buildDeathrattleSummons(board, minion) {
 }
 
 function cloneForBattle(minion) {
-  return {
-    ...copyMinion(minion),
-    keywords: [...minion.keywords],
-    deathrattle: minion.deathrattle ? { ...minion.deathrattle } : null,
-    combatStart: minion.combatStart ? { ...minion.combatStart } : null,
-  };
+  return copyMinion(minion);
 }
 
 function createOwnedMinion(id) {
@@ -1778,22 +1749,17 @@ function createOwnedMinion(id) {
 }
 
 function cloneTemplate(minion) {
-  return {
-    id: minion.id,
-    name: minion.name,
-    tier: minion.tier,
-    tribe: minion.tribe,
-    attack: minion.attack,
-    health: minion.health,
-    keywords: [...minion.keywords],
-    deathrattle: minion.deathrattle ? { ...minion.deathrattle } : null,
-    combatStart: minion.combatStart ? { ...minion.combatStart } : null,
-    text: minion.text,
-    token: Boolean(minion.token),
-  };
+  return createMinionSnapshot(minion);
 }
 
 function copyMinion(minion) {
+  return createMinionSnapshot(minion, {
+    golden: Boolean(minion.golden),
+    instanceId: minion.instanceId ?? null,
+  });
+}
+
+function createMinionSnapshot(minion, runtimeFields = {}) {
   return {
     id: minion.id,
     name: minion.name,
@@ -1802,13 +1768,17 @@ function copyMinion(minion) {
     attack: minion.attack,
     health: minion.health,
     keywords: [...minion.keywords],
-    deathrattle: minion.deathrattle ? { ...minion.deathrattle } : null,
-    combatStart: minion.combatStart ? { ...minion.combatStart } : null,
+    ...cloneMinionAbilityFields(minion),
     text: minion.text,
     token: Boolean(minion.token),
-    golden: Boolean(minion.golden),
-    instanceId: minion.instanceId ?? null,
+    ...runtimeFields,
   };
+}
+
+function cloneMinionAbilityFields(minion) {
+  return Object.fromEntries(
+    MINION_ABILITY_FIELDS.map((field) => [field, minion[field] ? { ...minion[field] } : null])
+  );
 }
 
 function getSideLabel(side) {
