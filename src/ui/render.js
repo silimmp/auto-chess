@@ -1,6 +1,4 @@
-import { REFRESH_COST, UPGRADE_COSTS } from "../data/rules.js";
-
-export function renderGame({
+function renderGame({
   state,
   dragState,
   elements,
@@ -143,88 +141,6 @@ function renderBattleLane(container, minions, emptyText, state, elements) {
   });
 }
 
-function buildMinionCard(minion, options = {}) {
-  const { battle = false, showActions = true, slotLabel = "", battleVisual = null } = options;
-  const healthValue = Math.max(0, minion.health);
-  const healthClass = healthValue <= 0 ? "zero" : healthValue <= 2 ? "low" : "";
-  const battleStateClasses = battleVisual
-    ? [
-        battleVisual.isAttacker ? "attacking" : "",
-        battleVisual.isDefender ? "defending" : "",
-        battleVisual.chargeClass,
-        battleVisual.takingHit ? "taking-hit" : "",
-        battleVisual.defeated ? "defeated" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")
-    : "";
-
-  const card = document.createElement("article");
-  card.className = `minion-card${minion.golden ? " golden" : ""}${battle ? " battle-card" : ""}${battleStateClasses ? ` ${battleStateClasses}` : ""}`;
-
-  const keywords = minion.keywords
-    .map((keyword) => {
-      const label = getKeywordLabel(keyword);
-      const className =
-        keyword === "taunt" || keyword === "provoke"
-          ? "keyword taunt"
-          : keyword === "divineShield"
-            ? "keyword shield"
-            : "keyword";
-      return `<span class="${className}">${label}</span>`;
-    })
-    .join("");
-
-  const battleTop = battle
-    ? `
-      <div class="battle-card-top">
-        <span class="battle-slot">${slotLabel}</span>
-        ${battleVisual?.roleLabel ? `<span class="battle-role ${battleVisual.roleClass}">${battleVisual.roleLabel}</span>` : ""}
-      </div>
-    `
-    : "";
-
-  const infoToggle = !battle ? '<button type="button" class="card-info-toggle" aria-label="查看描述">i</button>' : "";
-  const descriptionBlock = battle ? `<p class="minion-text">${minion.text || "没有额外效果。"}</p>` : "";
-  const infoOverlay = !battle
-    ? `
-      <div class="minion-info-overlay">
-        <div class="minion-info-label">随从描述</div>
-        <h4 class="minion-info-name">${minion.name}</h4>
-        <p class="minion-info-text">${minion.text || "没有额外效果。"}</p>
-      </div>
-    `
-    : "";
-
-  card.innerHTML = `
-    <div class="minion-main">
-      ${battleTop}
-      <div class="minion-header">
-        <span class="tier-badge">★${minion.tier}</span>
-        <div class="minion-title-block">
-          <h3 class="minion-name">${minion.golden ? "金色" : ""}${minion.name}</h3>
-          <div class="minion-meta">${minion.tribe}</div>
-        </div>
-        ${infoToggle}
-      </div>
-      ${descriptionBlock}
-      <div class="keyword-row">${keywords}</div>
-      ${infoOverlay}
-    </div>
-    <div>
-      <div class="stats-row">
-        <div class="stats">
-          <span class="stat-pill attack">${minion.attack}</span>
-          <span class="stat-pill health ${healthClass}">${healthValue}</span>
-        </div>
-      </div>
-      ${showActions ? '<div class="card-actions"></div>' : ""}
-    </div>
-  `;
-
-  return card;
-}
-
 function getBattleVisualState(state, minion, side) {
   const animation = state.battleAnimation;
   if (state.phase !== "battle" || !animation.active) {
@@ -243,27 +159,4 @@ function getBattleVisualState(state, minion, side) {
     roleLabel: isAttacker ? "进攻" : isDefender ? "受击" : "",
     roleClass: isAttacker ? "attacker" : isDefender ? "defender" : "",
   };
-}
-
-function makeEmptyCard(text) {
-  const card = document.createElement("div");
-  card.className = "empty-card";
-  card.textContent = text;
-  return card;
-}
-
-function getKeywordLabel(keyword) {
-  if (keyword === "taunt") {
-    return "嘲讽";
-  }
-  if (keyword === "provoke") {
-    return "挑衅";
-  }
-  if (keyword === "divineShield") {
-    return "圣盾";
-  }
-  if (keyword === "deathrattle") {
-    return "亡语";
-  }
-  return keyword;
 }

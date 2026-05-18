@@ -26,6 +26,27 @@ python -m http.server 8080
 
 然后访问 `http://localhost:8080`
 
+如果你想快速做一次核心回归，可以执行：
+
+```powershell
+node .\scripts\smoke-regression.js
+```
+
+如果你想做一轮真实页面交互回归，可以执行：
+
+```powershell
+node .\scripts\browser-regression.js
+```
+
+说明：这个脚本会临时起一个本地静态服务，并调用本机已安装的 Chrome 或 Edge 做无头页面检查。
+如果当前环境里找不到 `playwright-core` 或浏览器可执行文件，可以通过环境变量覆盖：
+
+```powershell
+$env:PLAYWRIGHT_CORE_PATH = '你的 playwright-core\\index.js'
+$env:BROWSER_REGRESSION_BROWSER = '你的浏览器.exe'
+node .\scripts\browser-regression.js
+```
+
 ## 当前规则说明
 
 - 初始 30 血

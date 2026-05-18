@@ -1,51 +1,64 @@
-import {
-  BOARD_LIMIT,
-  CONTENT_TIER_CAP,
-  ENEMY_BOARD_RULES,
-  MAX_TAVERN_TIER,
-  SHOP_SLOTS,
-} from "../data/rules.js";
-import { MINION_POOL, cloneTemplate, createOwnedMinion } from "../data/minions.js";
+function refreshShopState(state, generateShop) {
+  if (state.phase !== "prep" || state.gold < 1 || state.hp <= 0) {
+    return false;
+  }
 
-export function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard) {
-  state.turn += 1;
-  state.gold = Math.min(10, state.turn + 2);
-  state.shop = state.shopFrozen ? refillShop(state.shop, state.tavernTier) : generateShop(state.tavernTier);
+  state.gold -= 1;
+  state.shop = generateShop(state.tavernTier);
   state.shopFrozen = false;
-  state.enemyBoard = generateEnemyBoard(state.turn);
+  state.message = "酒馆老板换了一批货。";
+  return true;
 }
 
-export function generateShop(maxTier, pickRandom) {
+function toggleFreezeShopState(state) {
+  if (state.phase !== "prep" || state.hp <= 0 || !state.shop.length) {
+    return false;
+  }
+
+  state.shopFrozen = !state.shopFrozen;
+  state.message = state.shopFrozen ? "本轮商店已冻结。" : "已取消冻结。";
+  return true;
+}
+
+function buyMinionState(state, shopIndex) {
+  if (state.phase !== "prep") {
+    return false;
+  }
+
+  const shopMinion = state.shop[shopIndex];
+  if (!shopMinion) {
+    return false;
+  }
+  if (state.gold < BUY_COST) {
+    state.message = "金币不够，先忍一手。";
+    return true;
+  }
+  if (state.hand.length >= HAND_LIMIT) {
+    state.message = "手牌已满，先处理一下手牌。";
+    return true;
+  }
+
+  state.gold -= BUY_COST;
+  state.shop.splice(shopIndex, 1);
+  const purchasedMinion = createOwnedMinion(shopMinion.id);
+  state.hand.push(purchasedMinion);
+
+  const merged = resolveTriples(state);
+  state.message = buildRecruitMessage(`买下了 ${shopMinion.name}，已置入手牌`, merged);
+  return true;
+}
+
+function generateShop(maxTier, pickRandom) {
   const effectiveTier = Math.min(maxTier, CONTENT_TIER_CAP);
   const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier <= effectiveTier);
   return Array.from({ length: SHOP_SLOTS }, () => cloneTemplate(pickRandom(candidates)));
 }
 
-export function refillShop(currentShop, maxTier, pickRandom) {
+function refillShop(currentShop, maxTier, pickRandom) {
   const filledShop = currentShop.map(cloneTemplate);
   const missing = Math.max(0, SHOP_SLOTS - filledShop.length);
   if (missing === 0) {
     return filledShop;
   }
   return [...filledShop, ...generateShop(maxTier, pickRandom).slice(0, missing)];
-}
-
-export function generateEnemyBoard(turn, pickRandom, randomInt) {
-  const enemyTier = Math.min(Math.min(MAX_TAVERN_TIER, ENEMY_BOARD_RULES.tierCap), 1 + Math.floor((turn - 1) / 2));
-  const baseSize = Math.min(BOARD_LIMIT, 1 + Math.floor((turn - 1) / 2));
-  const size = Math.min(
-    BOARD_LIMIT,
-    baseSize +
-      (turn >= ENEMY_BOARD_RULES.extraSizeTurnThreshold
-        ? randomInt(0, ENEMY_BOARD_RULES.extraSizeRollMax)
-        : 0)
-  );
-  const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier <= enemyTier);
-  const board = [];
-
-  for (let index = 0; index < size; index += 1) {
-    const minion = createOwnedMinion(pickRandom(candidates).id);
-    board.push(minion);
-  }
-  return board;
 }

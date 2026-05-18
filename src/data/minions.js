@@ -1,5 +1,3 @@
-import { MINION_ABILITY_FIELDS } from "./rules.js";
-
 const MINION_POOL = [
   {
     id: "alley-cat",
@@ -641,7 +639,7 @@ function cloneMinionAbilityFields(minion) {
   );
 }
 
-export function createMinionSnapshot(minion, runtimeFields = {}) {
+function createMinionSnapshot(minion, runtimeFields = {}) {
   return {
     id: minion.id,
     name: minion.name,
@@ -658,22 +656,22 @@ export function createMinionSnapshot(minion, runtimeFields = {}) {
   };
 }
 
-export function cloneTemplate(minion) {
+function cloneTemplate(minion) {
   return createMinionSnapshot(minion);
 }
 
-export function copyMinion(minion) {
+function copyMinion(minion) {
   return createMinionSnapshot(minion, {
     golden: Boolean(minion.golden),
     instanceId: minion.instanceId ?? null,
   });
 }
 
-export function cloneForBattle(minion) {
+function cloneForBattle(minion) {
   return copyMinion(minion);
 }
 
-export function createOwnedMinion(id) {
+function createOwnedMinion(id) {
   const template = byId.get(id);
   return {
     ...cloneTemplate(template),
@@ -682,7 +680,7 @@ export function createOwnedMinion(id) {
   };
 }
 
-export function createGoldenMinion(base) {
+function createGoldenMinion(base) {
   return {
     ...copyMinion(base),
     attack: base.attack * 2,
@@ -691,5 +689,3 @@ export function createGoldenMinion(base) {
     instanceId: nextInstanceId++,
   };
 }
-
-export { MINION_POOL, byId };
