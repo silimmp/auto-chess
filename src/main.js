@@ -55,6 +55,15 @@ function startGameApp() {
     cleanupDragState,
     copyMinion,
     createOwnedMinion,
+    syncEnemyBoard(board) {
+      state.enemyBoard = board.map(copyMinion);
+      const enemy = getLobbyPlayerById(state.lobby, state.currentOpponentId);
+      if (enemy) {
+        enemy.board = state.enemyBoard.map(copyMinion);
+      } else {
+        state.lobby.ghostBoard = state.enemyBoard.map(copyMinion);
+      }
+    },
     render,
     resetGame,
     resolveTriples,
@@ -181,6 +190,9 @@ function startGameApp() {
     state.timeLeft = getPrepDuration(state.turn);
     state.prepEndsAt = Date.now() + state.timeLeft * 1000;
     prepTimerId = window.setInterval(updatePrepCountdown, TIMER_TICK_MS);
+    if (state.message === getPrepStartMessage(state.turn)) {
+      state.message = getLobbyStatusMessage(state);
+    }
     render();
   }
 
@@ -219,11 +231,28 @@ function startGameApp() {
     state.timeLeft = 0;
 
     const intro = trigger === "timer" ? "准备时间结束，自动进入战斗。" : "你提前结束了准备阶段。";
-    const result = simulateBattle(state.board, state.enemyBoard);
-    const damage = result.winner === "enemy" ? calculateBattleDamage(result.remainingEnemy) : 0;
+    const lobbyRound = resolveLobbyRound(
+      state.lobby,
+      state,
+      simulateBattle,
+      generateEnemyBoard,
+      pickRandom,
+      randomInt
+    );
+    const playerBattle =
+      lobbyRound.playerBattle ||
+      {
+        opponentId: state.currentOpponentId,
+        result: simulateBattle(state.board, state.enemyBoard),
+        damageToPlayer: 0,
+      };
+    const opponent =
+      playerBattle.opponentId === "ghost" ? null : getLobbyPlayerById(state.lobby, playerBattle.opponentId);
+    const result = playerBattle.result;
+    const damage = playerBattle.damageToPlayer;
     const roundMessage =
       result.winner === "player"
-        ? "这回合打赢了。"
+        ? `这回合打赢了${opponent ? ` ${opponent.name}` : LOBBY_GHOST_LABEL}。`
         : result.winner === "enemy"
           ? `这回合没打过，掉了 ${damage} 点血。`
           : "这回合打平了。";
@@ -237,7 +266,7 @@ function startGameApp() {
       winner: result.winner,
     };
     state.message = "战斗开始，正在结算中。";
-    beginBattlePlayback(result, intro, roundMessage, damage);
+    beginBattlePlayback(result, intro, roundMessage, damage, lobbyRound);
   }
 
   function beginBattlePlayback(result, intro, roundMessage, damage) {
@@ -296,7 +325,7 @@ function startGameApp() {
     });
   }
 
-  async function playBattleFrames(runId, result, intro, roundMessage, damage) {
+  async function playBattleFrames(runId, result, intro, roundMessage, damage, lobbyRound) {
     await waitBattleDelay(BATTLE_INTRO_DELAY_MS);
     if (runId !== battleAnimationRunId) {
       return;
@@ -322,9 +351,7 @@ function startGameApp() {
       }
     }
 
-    if (damage > 0) {
-      state.hp -= damage;
-    }
+    state.hp = getLobbyPlayerById(state.lobby, "player")?.hp ?? state.hp;
 
     state.battleAnimation = {
       ...state.battleAnimation,
@@ -350,10 +377,14 @@ function startGameApp() {
 
     if (state.hp <= 0) {
       state.phase = "gameOver";
-      state.message = "酒馆之旅结束了，点击重新开始可以再来一局。";
+      state.message = `你被淘汰了，本局排名第 ${getPlayerPlacement(state.lobby)}。点击重新开始可以再来一局。`;
+    } else if (isLobbyFinished(state.lobby)) {
+      state.phase = "gameOver";
+      state.message = "你拿到了第 1 名，这局吃鸡了。点击重新开始可以再来一局。";
     } else {
       state.phase = "battle";
-      state.message = roundMessage;
+      const recentSummary = state.lobby.roundSummaries.slice(0, 2).join(" ");
+      state.message = recentSummary ? `${roundMessage} ${recentSummary}` : roundMessage;
       stopPostBattleReturn();
       postBattleTimerId = window.setTimeout(() => {
         postBattleTimerId = null;
@@ -369,7 +400,9 @@ function startGameApp() {
       state,
       (tier) => generateShop(tier, pickRandom),
       (shop, tier) => refillShop(shop, tier, pickRandom),
-      (turn) => generateEnemyBoard(turn, pickRandom, randomInt)
+      (turn) => generateEnemyBoard(turn, pickRandom, randomInt),
+      pickRandom,
+      randomInt
     );
   }
 

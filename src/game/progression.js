@@ -1,9 +1,22 @@
-function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard) {
+function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard, pickRandom, randomInt) {
   state.turn += 1;
   state.gold = getTurnGold(state.turn);
   state.shop = state.shopFrozen ? refillShop(state.shop, state.tavernTier) : generateShop(state.tavernTier);
   state.shopFrozen = false;
-  state.enemyBoard = generateEnemyBoard(state.turn);
+  state.lobby.pairings = createPairings(state.lobby.players, state.turn);
+  state.currentOpponentId = findOpponentIdForPlayer(state.lobby.pairings, "player");
+  state.lobby.currentOpponentId = state.currentOpponentId;
+  const currentOpponent = getLobbyPlayerById(state.lobby, state.currentOpponentId);
+  if (currentOpponent) {
+    if (!currentOpponent.isHuman && currentOpponent.alive && currentOpponent.board.length === 0) {
+      currentOpponent.board = generateEnemyBoard(state.turn, pickRandom, randomInt);
+    }
+    state.enemyBoard = currentOpponent.board.map(copyMinion);
+    state.currentOpponentName = currentOpponent.name;
+  } else {
+    state.enemyBoard = state.lobby.ghostBoard.map(copyMinion);
+    state.currentOpponentName = LOBBY_GHOST_LABEL;
+  }
 }
 
 function upgradeTavernState(state, upgradeCosts, generateShop) {

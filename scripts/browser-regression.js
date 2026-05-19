@@ -189,6 +189,12 @@ async function waitForPrepTurn(page, expectedTurn, timeout = 12000) {
   );
 }
 
+async function syncEnemyBoard(page) {
+  await page.evaluate(() => {
+    window.__AUTO_CHESS_TEST_API__.syncEnemyBoard(window.__AUTO_CHESS_TEST_API__.state.enemyBoard);
+  });
+}
+
 async function waitForBattleResult(page, timeout = 12000) {
   await page.waitForFunction(
     () =>
@@ -373,6 +379,7 @@ async function main() {
           api.state.enemyBoard[0].health = 2;
           api.render();
         });
+        await syncEnemyBoard(page);
 
         await page.click("#battle-btn");
         await waitForBattleResult(page);
@@ -404,6 +411,7 @@ async function main() {
           api.state.enemyBoard = [api.createOwnedMinion("holy-mech")];
           api.render();
         });
+        await syncEnemyBoard(page);
 
         await page.click("#battle-btn");
         await waitForBattleResult(page);
@@ -442,6 +450,7 @@ async function main() {
           ];
           api.render();
         });
+        await syncEnemyBoard(page);
 
         await page.click("#battle-btn");
         await waitForBattleResult(page);
@@ -478,6 +487,7 @@ async function main() {
           api.state.enemyBoard = [api.createOwnedMinion("arena-champion")];
           api.render();
         });
+        await syncEnemyBoard(page);
 
         await page.click("#battle-btn");
         await waitForBattleResult(page);
@@ -509,6 +519,7 @@ async function main() {
           api.state.enemyBoard = [api.createOwnedMinion("arena-champion")];
           api.render();
         });
+        await syncEnemyBoard(page);
 
         for (let index = 0; index < 3; index += 1) {
           await page.click("#battle-btn");
@@ -527,6 +538,22 @@ async function main() {
         assert(stressState.phase === "prep", "多回合压力后应回到准备阶段。");
         assert(stressState.battleActive === false, "回到准备阶段后战斗动画状态应已清空。");
         return stressState;
+      })
+    );
+
+    results.push(
+      await runScenario("lobby-status", browser, url, async (page) => {
+        const lobbyState = await page.evaluate(() => ({
+          alive: document.querySelector("#lobby-alive-value")?.textContent?.trim(),
+          place: document.querySelector("#lobby-place-value")?.textContent?.trim(),
+          opponent: document.querySelector("#lobby-opponent-value")?.textContent?.trim(),
+          rosterCount: document.querySelectorAll("#lobby-roster .lobby-chip").length,
+        }));
+
+        assert(lobbyState.alive === "8", "开局大厅应显示 8 名存活玩家。");
+        assert(lobbyState.rosterCount === 8, "大厅名单应列出全部存活玩家。");
+        assert(lobbyState.opponent && lobbyState.opponent.length > 0, "大厅面板应显示当前对手。");
+        return lobbyState;
       })
     );
   } finally {

@@ -16,6 +16,11 @@ function createElements() {
     battleView: document.querySelector("#battle-view"),
     battleEnemy: document.querySelector("#battle-enemy-board"),
     battlePlayer: document.querySelector("#battle-player-board"),
+    lobbyAlive: document.querySelector("#lobby-alive-value"),
+    lobbyPlace: document.querySelector("#lobby-place-value"),
+    lobbyOpponent: document.querySelector("#lobby-opponent-value"),
+    lobbyRoster: document.querySelector("#lobby-roster"),
+    lobbyRecent: document.querySelector("#lobby-recent"),
     refreshBtn: document.querySelector("#refresh-btn"),
     upgradeBtn: document.querySelector("#upgrade-btn"),
     freezeBtn: document.querySelector("#freeze-btn"),
@@ -33,6 +38,8 @@ function createPrepZones(elements) {
 }
 
 function createInitialState(generateShop, generateEnemyBoard, pickRandom, randomInt) {
+  const lobby = createInitialLobby(generateEnemyBoard, pickRandom, randomInt);
+  const currentOpponent = getLobbyPlayerById(lobby, lobby.currentOpponentId);
   const initial = {
     turn: 1,
     hp: 30,
@@ -45,7 +52,10 @@ function createInitialState(generateShop, generateEnemyBoard, pickRandom, random
     shop: [],
     hand: [],
     board: [],
-    enemyBoard: [],
+    enemyBoard: currentOpponent ? currentOpponent.board.map(copyMinion) : [],
+    currentOpponentId: lobby.currentOpponentId,
+    currentOpponentName: currentOpponent ? currentOpponent.name : LOBBY_GHOST_LABEL,
+    lobby,
     lastBattle: {
       summary: "战斗尚未开始。",
       playerSnapshot: [],
@@ -58,7 +68,6 @@ function createInitialState(generateShop, generateEnemyBoard, pickRandom, random
   };
 
   initial.shop = generateShop(initial.tavernTier, pickRandom);
-  initial.enemyBoard = generateEnemyBoard(initial.turn, pickRandom, randomInt);
   return initial;
 }
 
@@ -85,6 +94,10 @@ function getPrepDuration(turn) {
 
 function getPrepStartMessage(turn) {
   return `第 ${turn} 回合准备阶段开始，${getPrepDuration(turn)} 秒后自动战斗。`;
+}
+
+function getLobbyStatusMessage(state) {
+  return `第 ${state.turn} 回合准备阶段开始，下一位对手是 ${state.currentOpponentName}。`;
 }
 
 function getPhaseLabel(phase) {

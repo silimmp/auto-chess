@@ -205,6 +205,54 @@ body {
   min-height: 0;
 }
 
+.lobby-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.lobby-subhead {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lobby-list-block {
+  display: grid;
+  gap: 8px;
+}
+
+.lobby-roster,
+.lobby-recent {
+  display: grid;
+  gap: 6px;
+}
+
+.lobby-chip {
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--ink);
+  background: rgba(77, 49, 24, 0.08);
+}
+
+.lobby-chip.self {
+  background: rgba(201, 150, 45, 0.18);
+  font-weight: 700;
+}
+
+.lobby-recent-item {
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink);
+  background: rgba(255, 248, 232, 0.72);
+}
+
 .message-text {
   font-size: 13px;
 }

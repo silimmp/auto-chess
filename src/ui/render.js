@@ -23,6 +23,7 @@ function renderGame({
   }
   syncTimerDisplay(state, elements);
   elements.message.textContent = state.message;
+  syncLobbyPanel(state, elements);
   elements.battleView.classList.toggle("hidden", isPrep);
 
   if (!skipZoneRenders && !(isPrep && dragState.status !== "idle")) {
@@ -35,6 +36,41 @@ function renderGame({
     renderBattleBoards(state, elements);
   }
   syncButtons(state, elements);
+}
+
+function syncLobbyPanel(state, elements) {
+  if (!elements.lobbyAlive || !state.lobby) {
+    return;
+  }
+
+  const alivePlayers = getAliveLobbyPlayers(state.lobby.players);
+  elements.lobbyAlive.textContent = alivePlayers.length;
+  elements.lobbyPlace.textContent = `${getPlayerPlacement(state.lobby)}`;
+  elements.lobbyOpponent.textContent = state.currentOpponentName || LOBBY_GHOST_LABEL;
+
+  if (elements.lobbyRoster) {
+    elements.lobbyRoster.innerHTML = "";
+    alivePlayers
+      .slice()
+      .sort((left, right) => right.hp - left.hp)
+      .forEach((player) => {
+        const chip = document.createElement("div");
+        chip.className = `lobby-chip${player.isHuman ? " self" : ""}`;
+        chip.textContent = `${player.name} · ${player.hp}`;
+        elements.lobbyRoster.appendChild(chip);
+      });
+  }
+
+  if (elements.lobbyRecent) {
+    elements.lobbyRecent.innerHTML = "";
+    const recent = state.lobby.roundSummaries.length ? state.lobby.roundSummaries : ["本轮战斗尚未开始。"];
+    recent.slice(0, 3).forEach((line) => {
+      const item = document.createElement("div");
+      item.className = "lobby-recent-item";
+      item.textContent = line;
+      elements.lobbyRecent.appendChild(item);
+    });
+  }
 }
 
 function syncTimerDisplay(state, elements) {

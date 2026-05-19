@@ -197,13 +197,15 @@ function createHarness(projectRoot) {
 
 function testBoot(projectRoot) {
   const harness = createHarness(projectRoot);
-  const summary = harness.run("({ turn: window.__AUTO_CHESS_TEST_API__.state.turn, gold: window.__AUTO_CHESS_TEST_API__.state.gold, phase: window.__AUTO_CHESS_TEST_API__.state.phase, shopLen: window.__AUTO_CHESS_TEST_API__.state.shop.length, enemyLen: window.__AUTO_CHESS_TEST_API__.state.enemyBoard.length, message: window.__AUTO_CHESS_TEST_API__.state.message })");
+  const summary = harness.run("({ turn: window.__AUTO_CHESS_TEST_API__.state.turn, gold: window.__AUTO_CHESS_TEST_API__.state.gold, phase: window.__AUTO_CHESS_TEST_API__.state.phase, shopLen: window.__AUTO_CHESS_TEST_API__.state.shop.length, enemyLen: window.__AUTO_CHESS_TEST_API__.state.enemyBoard.length, lobbyAlive: window.__AUTO_CHESS_TEST_API__.state.lobby.players.filter((player) => player.alive).length, currentOpponentName: window.__AUTO_CHESS_TEST_API__.state.currentOpponentName, message: window.__AUTO_CHESS_TEST_API__.state.message })");
   assert(summary.turn === 1, "初始回合应为 1。");
   assert(summary.gold === 3, "初始金币应为 3。");
   assert(summary.phase === "prep", "开局应处于准备阶段。");
   assert(summary.shopLen === 5, "开局商店应生成 5 张牌。");
   assert(summary.enemyLen >= 1, "开局应生成敌方阵容。");
-  assert(summary.message.includes("第 1 回合"), "开局提示文案异常。");
+  assert(summary.lobbyAlive === 8, "开局应存在 8 名存活大厅玩家。");
+  assert(summary.currentOpponentName, "开局应存在当前对手。");
+  assert(summary.message.includes("下一位对手"), "开局提示文案应说明当前大厅对手。");
 }
 
 function testBuyPlayAndFreeze(projectRoot) {
@@ -596,6 +598,33 @@ function testElfRepeatedShots(projectRoot) {
   assert(summary.remainingEnemy.length <= 1, "高星精灵多段点杀后应显著削减敌方阵容。");
 }
 
+function testLobbyBattlePerspective(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.turn = 2;
+    state.board = [createOwnedMinion("taunt-guard")];
+    state.enemyBoard = [createOwnedMinion("arena-champion")];
+    const enemy = getLobbyPlayerById(state.lobby, state.currentOpponentId);
+    if (enemy) {
+      enemy.board = state.enemyBoard.map(copyMinion);
+    }
+    state.lobby.pairings = [{ a: "ai-1", b: "player" }];
+    const round = resolveLobbyRound(state.lobby, state, simulateBattle, generateEnemyBoard, pickRandom, randomInt);
+    globalThis.__lobbyPerspectiveSummary = {
+      playerBattle: {
+        startingPlayer: round.playerBattle.result.startingPlayer.map((minion) => minion.name),
+        startingEnemy: round.playerBattle.result.startingEnemy.map((minion) => minion.name),
+        logs: round.playerBattle.result.logs,
+      },
+    };
+  `);
+  const summary = harness.run("__lobbyPerspectiveSummary");
+  assert(summary.playerBattle.startingPlayer[0] === "人类守卫", "玩家处于配对后手时，我方战斗快照仍应显示真实上场的玩家随从。");
+  assert(summary.playerBattle.startingEnemy[0] === "兽人统领", "玩家处于配对后手时，敌方战斗快照应显示真实对手随从。");
+  assert(summary.playerBattle.logs.some((line) => line.includes("我方 人类守卫") || line.includes("敌方 兽人统领")), "战斗日志应以玩家视角记录双方。");
+}
+
 function main() {
   const projectRoot = path.resolve(__dirname, "..");
   const tests = [
@@ -620,6 +649,7 @@ function main() {
     ["orc-damage-triggers", testOrcDamageTriggers],
     ["human-formation-buffs", testHumanFormationBuffs],
     ["elf-repeated-shots", testElfRepeatedShots],
+    ["lobby-battle-perspective", testLobbyBattlePerspective],
   ];
 
   tests.forEach(([name, test]) => {
