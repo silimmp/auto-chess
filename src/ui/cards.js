@@ -58,7 +58,6 @@ function buildMinionCard(minion, options = {}) {
         <span class="tier-badge">★${minion.tier}</span>
         <div class="minion-title-block">
           <h3 class="minion-name">${minion.golden ? "金色" : ""}${minion.name}</h3>
-          <div class="minion-meta">${minion.tribe}</div>
         </div>
         ${infoToggle}
       </div>
@@ -66,12 +65,11 @@ function buildMinionCard(minion, options = {}) {
       <div class="keyword-row">${keywords}</div>
       ${infoOverlay}
     </div>
-    <div>
+    <div class="minion-footer">
+      <div class="minion-meta">${minion.tribe}</div>
       <div class="stats-row">
-        <div class="stats">
-          <span class="stat-pill attack">${minion.attack}</span>
-          <span class="stat-pill health ${healthClass}">${healthValue}</span>
-        </div>
+        <span class="stat-pill attack">${minion.attack}</span>
+        <span class="stat-pill health ${healthClass}">${healthValue}</span>
       </div>
       ${showActions ? '<div class="card-actions"></div>' : ""}
     </div>

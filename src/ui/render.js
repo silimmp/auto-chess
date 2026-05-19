@@ -5,7 +5,9 @@ function renderGame({
   cleanupDragState,
   bindPrepCardInteractions,
   getPhaseLabel,
+  options = {},
 }) {
+  const { skipZoneRenders = false } = options;
   const isPrep = state.phase === "prep";
   if (!isPrep && dragState.status !== "idle") {
     cleanupDragState();
@@ -20,13 +22,15 @@ function renderGame({
   elements.message.textContent = state.message;
   elements.battleView.classList.toggle("hidden", isPrep);
 
-  if (!(isPrep && dragState.status !== "idle")) {
+  if (!skipZoneRenders && !(isPrep && dragState.status !== "idle")) {
     renderShop(state, elements, bindPrepCardInteractions);
     renderHand(state, elements, bindPrepCardInteractions);
     renderPlayerBoard(state, elements, bindPrepCardInteractions);
   }
 
-  renderBattleBoards(state, elements);
+  if (!skipZoneRenders) {
+    renderBattleBoards(state, elements);
+  }
   syncButtons(state, elements);
 }
 

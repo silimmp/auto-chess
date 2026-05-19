@@ -111,6 +111,20 @@ function startGameApp() {
     });
   }
 
+  function renderStatusOnly() {
+    renderGame({
+      state,
+      dragState,
+      elements,
+      cleanupDragState,
+      bindPrepCardInteractions,
+      getPhaseLabel,
+      options: {
+        skipZoneRenders: true,
+      },
+    });
+  }
+
   function refreshShop() {
     if (refreshShopState(state, (tier) => generateShop(tier, pickRandom))) {
       render();
@@ -187,7 +201,7 @@ function startGameApp() {
     const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
     if (remainingSeconds !== state.timeLeft) {
       state.timeLeft = remainingSeconds;
-      render();
+      renderStatusOnly();
     }
     if (remainingMs <= 0) {
       endTurnAndBattle("timer");

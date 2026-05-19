@@ -12,6 +12,39 @@
 - 圣盾、嘲讽、亡语
 - 简化版三连合成
 
+## 公开给别人玩
+
+这个项目现在是纯前端静态网页，不需要单独后端，可以直接部署到 GitHub Pages。
+
+如果你的 GitHub 用户名是 `your-name`，仓库名是 `auto-chess`，上线后的地址通常会是：
+
+`https://your-name.github.io/auto-chess/`
+
+仓库里已经包含 GitHub Pages 自动部署工作流 [.github/workflows/deploy-pages.yml](C:/baidu/自走棋/.github/workflows/deploy-pages.yml:1)，正常情况下只要推到 `main` 分支就会自动发布。
+
+### GitHub Pages 发布步骤
+
+1. 在 GitHub 上新建一个仓库。
+2. 把当前项目推到这个仓库的 `main` 分支。
+3. 打开仓库页面的 `Settings -> Pages`。
+4. 在 `Build and deployment` 里把 `Source` 设为 `GitHub Actions`。
+5. 等待仓库里的 `Deploy GitHub Pages` 工作流跑完。
+6. 发布成功后，访问 GitHub Pages 给你的公开地址。
+
+如果你还没有把本地仓库推到 GitHub，可以参考下面这组命令，把 `your-name` 和 `auto-chess` 替换成你自己的：
+
+```powershell
+git remote add origin https://github.com/your-name/auto-chess.git
+git branch -M main
+git push -u origin main
+```
+
+说明：
+
+- 这个项目当前使用的是相对路径资源引用，适合直接挂在 GitHub Pages 的项目路径下。
+- 现有工作流只会发布运行游戏真正需要的文件：`index.html`、`styles.css`、`src/`。
+- `scripts/`、`artifacts/` 这些开发和回归文件不会被部署到线上。
+
 ## 怎么运行
 
 最简单的方法：
@@ -29,13 +62,19 @@ python -m http.server 8080
 如果你想快速做一次核心回归，可以执行：
 
 ```powershell
-node .\scripts\smoke-regression.js
+npm run smoke
 ```
 
 如果你想做一轮真实页面交互回归，可以执行：
 
 ```powershell
-node .\scripts\browser-regression.js
+npm run browser:regression
+```
+
+如果你想专门检查卡牌排版位置，可以执行：
+
+```powershell
+npm run visual:layout
 ```
 
 说明：这个脚本会临时起一个本地静态服务，并调用本机已安装的 Chrome 或 Edge 做无头页面检查。
@@ -44,8 +83,16 @@ node .\scripts\browser-regression.js
 ```powershell
 $env:PLAYWRIGHT_CORE_PATH = '你的 playwright-core\\index.js'
 $env:BROWSER_REGRESSION_BROWSER = '你的浏览器.exe'
-node .\scripts\browser-regression.js
+npm run browser:regression
 ```
+
+如果你想把两套回归连续跑完，可以执行：
+
+```powershell
+npm run regression
+```
+
+`npm run visual:layout` 会额外输出一组卡牌布局测量值，并生成截图到 [artifacts/visual-layout-card.png](C:/baidu/自走棋/artifacts/visual-layout-card.png:1)，方便直接核对种族和左右属性的位置。
 
 ## 当前规则说明
 

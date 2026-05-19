@@ -507,6 +507,10 @@ body {
     filter 0.28s ease;
 }
 
+.minion-card:not(.battle-card) {
+  min-height: 170px;
+}
+
 .minion-card.draggable-card {
   cursor: grab;
   user-select: none;
@@ -670,6 +674,9 @@ body {
 
 .minion-main {
   position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
 .minion-title-block {
@@ -680,14 +687,14 @@ body {
 
 .minion-name {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.12;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .hand-row .minion-name {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.08;
 }
 
@@ -704,12 +711,15 @@ body {
 
 .minion-meta {
   margin-top: 4px;
-  font-size: 10px;
-  color: rgba(45, 27, 18, 0.74);
+  padding-bottom: 6px;
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+  color: rgba(88, 51, 18, 0.9);
 }
 
 .hand-row .minion-meta {
-  margin-top: 4px;
+  font-size: 13px;
 }
 
 .minion-text {
@@ -815,13 +825,14 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 6px;
+  margin-top: 0;
   font-weight: 700;
 }
 
-.stats {
+.minion-footer {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 0;
 }
 
 .stat-pill {
