@@ -22,7 +22,9 @@ function renderGame({
     elements.shopOdds.textContent = formatTierOdds(SHOP_TIER_ODDS[state.tavernTier]);
   }
   syncTimerDisplay(state, elements);
-  elements.message.textContent = state.message;
+  if (elements.message) {
+    elements.message.textContent = state.message;
+  }
   syncLobbyPanel(state, elements);
   elements.battleView.classList.toggle("hidden", isPrep);
 
@@ -43,9 +45,10 @@ function syncLobbyPanel(state, elements) {
     return;
   }
 
-  const alivePlayers = getAliveLobbyPlayers(state.lobby.players);
+  const lobbyView = state.pendingLobbySnapshot || state.lobby;
+  const alivePlayers = getAliveLobbyPlayers(lobbyView.players);
   elements.lobbyAlive.textContent = alivePlayers.length;
-  elements.lobbyPlace.textContent = `${getPlayerPlacement(state.lobby)}`;
+  elements.lobbyPlace.textContent = `${getPlayerPlacement(lobbyView)}`;
   elements.lobbyOpponent.textContent = state.currentOpponentName || LOBBY_GHOST_LABEL;
 
   if (elements.lobbyRoster) {
@@ -57,6 +60,7 @@ function syncLobbyPanel(state, elements) {
         const chip = document.createElement("div");
         chip.className = `lobby-chip${player.isHuman ? " self" : ""}`;
         chip.textContent = `${player.name} · ${player.hp}`;
+        chip.title = `${player.name} · ${player.hp}`;
         elements.lobbyRoster.appendChild(chip);
       });
   }

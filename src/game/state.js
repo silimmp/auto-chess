@@ -56,6 +56,7 @@ function createInitialState(generateShop, generateEnemyBoard, pickRandom, random
     currentOpponentId: lobby.currentOpponentId,
     currentOpponentName: currentOpponent ? currentOpponent.name : LOBBY_GHOST_LABEL,
     lobby,
+    pendingLobbySnapshot: null,
     lastBattle: {
       summary: "战斗尚未开始。",
       playerSnapshot: [],
@@ -89,7 +90,10 @@ function createBattleAnimationState() {
 }
 
 function getPrepDuration(turn) {
-  return turn <= 3 ? PREP_SECONDS_EARLY : PREP_SECONDS_NORMAL;
+  if (turn <= 3) {
+    return PREP_SECONDS_EARLY;
+  }
+  return Math.min(PREP_SECONDS_CAP, PREP_SECONDS_EARLY + (turn - 3) * PREP_SECONDS_STEP);
 }
 
 function getPrepStartMessage(turn) {

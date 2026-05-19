@@ -206,6 +206,16 @@ async function waitForBattleResult(page, timeout = 12000) {
   );
 }
 
+async function waitForBattleAnimation(page, timeout = 12000) {
+  await page.waitForFunction(
+    () =>
+      window.__AUTO_CHESS_TEST_API__.state.phase === "battle" &&
+      window.__AUTO_CHESS_TEST_API__.state.battleAnimation.isAnimating,
+    null,
+    { timeout }
+  );
+}
+
 async function collectPrepCounts(page) {
   return page.evaluate(() => ({
     board: document.querySelectorAll("#player-board .minion-card").length,
@@ -538,6 +548,60 @@ async function main() {
         assert(stressState.phase === "prep", "多回合压力后应回到准备阶段。");
         assert(stressState.battleActive === false, "回到准备阶段后战斗动画状态应已清空。");
         return stressState;
+      })
+    );
+
+    results.push(
+      await runScenario("lobby-hp-settlement", browser, url, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.stopPostBattleReturn();
+          api.stopBattlePlayback();
+          api.state.phase = "prep";
+          api.state.timeLeft = 15;
+          api.state.hp = 30;
+          api.state.gold = 3;
+          api.state.turn = 1;
+          api.state.shop = [];
+          api.state.hand = [];
+          api.state.board = [api.createOwnedMinion("rat-pack")];
+          api.state.enemyBoard = [api.createOwnedMinion("arena-champion")];
+          const player = getLobbyPlayerById(api.state.lobby, "player");
+          if (player) {
+            player.hp = 30;
+          }
+          const enemy = getLobbyPlayerById(api.state.lobby, api.state.currentOpponentId);
+          if (enemy) {
+            enemy.hp = 30;
+            enemy.board = api.state.enemyBoard.map(api.copyMinion);
+          }
+          api.render();
+        });
+        await syncEnemyBoard(page);
+
+        await page.click("#battle-btn");
+        await waitForBattleAnimation(page);
+        const duringBattle = await page.evaluate(() => ({
+          lobbySelf: Array.from(document.querySelectorAll("#lobby-roster .lobby-chip"))
+            .find((node) => node.textContent.includes("你 ·"))
+            ?.textContent?.trim(),
+          hp: document.querySelector("#hp-value")?.textContent?.trim(),
+        }));
+
+        await waitForBattleResult(page);
+        const afterBattle = await page.evaluate(() => ({
+          lobbySelf: Array.from(document.querySelectorAll("#lobby-roster .lobby-chip"))
+            .find((node) => node.textContent.includes("你 ·"))
+            ?.textContent?.trim(),
+          hp: document.querySelector("#hp-value")?.textContent?.trim(),
+        }));
+
+        assert(duringBattle.lobbySelf === "你 · 30", "战斗播放期间，大厅中的玩家生命值不应提前结算。");
+        assert(duringBattle.hp === "30", "战斗播放期间，主生命值显示不应提前变化。");
+        assert(afterBattle.lobbySelf === "你 · 29", "战斗结算结束后，大厅中的玩家生命值应更新为战后结果。");
+        assert(afterBattle.hp === "29", "战斗结算结束后，主生命值应同步更新。");
+        return { afterBattle, duringBattle };
       })
     );
 

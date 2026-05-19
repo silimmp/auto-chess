@@ -229,6 +229,7 @@ function startGameApp() {
     stopPostBattleReturn();
     stopBattlePlayback();
     state.timeLeft = 0;
+    state.pendingLobbySnapshot = createLobbySnapshot(state.lobby);
 
     const intro = trigger === "timer" ? "准备时间结束，自动进入战斗。" : "你提前结束了准备阶段。";
     const lobbyRound = resolveLobbyRound(
@@ -313,6 +314,7 @@ function startGameApp() {
       window.clearTimeout(battleAnimationTimerId);
       battleAnimationTimerId = null;
     }
+    state.pendingLobbySnapshot = null;
     state.battleAnimation = createBattleAnimationState();
   }
 
@@ -374,6 +376,7 @@ function startGameApp() {
       logs: [...result.logs],
       winner: result.winner,
     };
+    state.pendingLobbySnapshot = null;
 
     if (state.hp <= 0) {
       state.phase = "gameOver";

@@ -1,5 +1,7 @@
 const LOBBY_PLAYER_COUNT = 8;
 const LOBBY_GHOST_LABEL = "幽灵";
+const LOBBY_NAME_PREFIXES = ["赤", "青", "白", "黑", "金", "银", "炎", "霜", "岚", "夜", "星", "雷"];
+const LOBBY_NAME_TITLES = ["旅团", "战团", "卫队", "猎手", "行者", "先驱", "守望", "尖兵", "铁卫", "游骑", "锋刃", "巡狩"];
 
 function createLobbyPlayer(id, name, isHuman = false) {
   return {
@@ -18,8 +20,9 @@ function createLobbyPlayer(id, name, isHuman = false) {
 
 function createInitialLobby(generateEnemyBoard, pickRandom, randomInt) {
   const players = [createLobbyPlayer("player", "你", true)];
+  const aiNames = createLobbyAiNames(pickRandom, randomInt, LOBBY_PLAYER_COUNT - 1);
   for (let index = 1; index < LOBBY_PLAYER_COUNT; index += 1) {
-    const ai = createLobbyPlayer(`ai-${index}`, `对手 ${index}`);
+    const ai = createLobbyPlayer(`ai-${index}`, aiNames[index - 1]);
     ai.board = generateEnemyBoard(1, pickRandom, randomInt);
     players.push(ai);
   }
@@ -227,4 +230,35 @@ function getPlayerPlacement(lobby) {
 
 function isLobbyFinished(lobby) {
   return getAliveLobbyPlayers(lobby.players).length <= 1;
+}
+
+function createLobbySnapshot(lobby) {
+  return {
+    players: lobby.players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      isHuman: player.isHuman,
+      hp: player.hp,
+      alive: player.alive,
+    })),
+    placementOrder: [...lobby.placementOrder],
+  };
+}
+
+function createLobbyAiNames(pickRandom, randomInt, count) {
+  const names = [];
+  const used = new Set();
+
+  while (names.length < count) {
+    const baseName = `${pickRandom(LOBBY_NAME_PREFIXES)}${pickRandom(LOBBY_NAME_TITLES)}`;
+    const suffix = randomInt(1, 9);
+    const candidate = used.has(baseName) ? `${baseName}${suffix}` : baseName;
+    if (used.has(candidate)) {
+      continue;
+    }
+    used.add(candidate);
+    names.push(candidate);
+  }
+
+  return names;
 }
