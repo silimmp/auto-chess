@@ -275,6 +275,266 @@ function testDeathrattleSummonCap(projectRoot) {
   assert(summonCount === 1, "亡语召唤数量不应突破战场上限。");
 }
 
+function testHighTierPoolAccess(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const preferHighestNumber = (candidates) =>
+      candidates.reduce((best, value) => {
+        const bestTier = typeof best === "number" ? best : best.tier;
+        const valueTier = typeof value === "number" ? value : value.tier;
+        return valueTier > bestTier ? value : best;
+      }, candidates[0]);
+    globalThis.__highTierSummary = {
+      shopTier4: generateShop(4, preferHighestNumber).map((minion) => minion.tier),
+      shopTier7: generateShop(7, preferHighestNumber).map((minion) => minion.tier),
+      enemyTier7: generateEnemyBoard(20, preferHighestNumber, () => 0).map((minion) => minion.tier),
+    };
+  `);
+  const summary = harness.run("__highTierSummary");
+  assert(summary.shopTier4.every((tier) => tier === 4), "4 星卡池尚未接入商店。");
+  assert(summary.shopTier7.every((tier) => tier === 7), "7 星卡池尚未接入商店。");
+  assert(summary.enemyTier7.length > 0, "高回合敌方阵容未生成。");
+  assert(summary.enemyTier7.every((tier) => tier === 7), "7 星卡池尚未接入敌方阵容。");
+}
+
+function testShopTierOdds(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const counts = {};
+    for (let i = 0; i < 200; i += 1) {
+      generateShop(7, pickRandom).forEach((minion) => {
+        counts[minion.tier] = (counts[minion.tier] || 0) + 1;
+      });
+    }
+    globalThis.__shopTierCounts = counts;
+  `);
+  const counts = harness.run("__shopTierCounts");
+  assert(counts[4] > counts[7], "7 级商店里 7 星牌不应比 4 星牌更常见。");
+  assert(counts[5] > counts[7], "7 级商店里 7 星牌应属于更稀有层。");
+}
+
+function testEconomyCurve(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.turn = 4;
+    state.gold = 0;
+    startNextTurnState(
+      state,
+      (tier) => generateShop(tier, pickRandom),
+      (shop, tier) => refillShop(shop, tier, pickRandom),
+      (turn) => generateEnemyBoard(turn, pickRandom, randomInt)
+    );
+    globalThis.__economySummary = {
+      turn: state.turn,
+      gold: state.gold,
+      upgrade2: UPGRADE_COSTS[2],
+      upgrade6: UPGRADE_COSTS[6],
+    };
+  `);
+  const summary = harness.run("__economySummary");
+  assert(summary.turn === 5, "经济曲线测试应推进到第 5 回合。");
+  assert(summary.gold === 8, "第 5 回合金币应提升到 8。");
+  assert(summary.upgrade2 === 6, "2 级升本费用应下调到 6。");
+  assert(summary.upgrade6 === 10, "6 级升本费用应下调到 10。");
+}
+
+function testEnemyGrowthCurve(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    globalThis.__enemyCurveSummary = {
+      tier3: getEnemyBoardTier(3),
+      tier4: getEnemyBoardTier(4),
+      size5: getEnemyBoardBaseSize(5) + ENEMY_BOARD_RULES.extraSizeRollMax,
+    };
+  `);
+  const summary = harness.run("__enemyCurveSummary");
+  assert(summary.tier3 === 1, "第 3 回合敌方不应过早进入 2 星池。");
+  assert(summary.tier4 === 2, "第 4 回合敌方应开始进入 2 星池。");
+  assert(summary.size5 <= 4, "第 5 回合敌方铺场不应过快突破中速节奏。");
+}
+
+function testBattleDamageCurve(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    globalThis.__battleDamageSummary = {
+      singleTierOne: calculateBattleDamage([createOwnedMinion("taunt-guard")]),
+      doubleTierSeven: calculateBattleDamage([createOwnedMinion("mythic-behemoth"), createOwnedMinion("doomfire-archon")]),
+      fullBoardHighTier: calculateBattleDamage([
+        createOwnedMinion("mythic-behemoth"),
+        createOwnedMinion("doomfire-archon"),
+        createOwnedMinion("eternal-necrolord"),
+        createOwnedMinion("apocalypse-engine"),
+      ]),
+    };
+  `);
+  const summary = harness.run("__battleDamageSummary");
+  assert(summary.singleTierOne === 1, "单个低星残阵应只造成 1 点伤害。");
+  assert(summary.doubleTierSeven === 5, "两个 7 星残局的伤害应被压到更平滑的区间。");
+  assert(summary.fullBoardHighTier === 11, "高星大残阵仍应造成显著伤害，但不应无限膨胀。");
+}
+
+function testCleaveAndPoisonous(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const attacker = createOwnedMinion("mythic-behemoth");
+    const ally = createOwnedMinion("tavern-attendant");
+    const allyTwo = createOwnedMinion("wandering-swordsman");
+    const defenderA = createOwnedMinion("taunt-guard");
+    const defenderB = createOwnedMinion("arena-champion");
+    const result = simulateBattle([attacker, ally, allyTwo], [defenderA, defenderB]);
+    globalThis.__cleavePoisonSummary = {
+      logs: result.logs,
+      remainingEnemy: result.remainingEnemy.map((minion) => minion.name),
+    };
+  `);
+  const summary = harness.run("__cleavePoisonSummary");
+  assert(summary.logs.some((line) => line.includes("顺劈波及")), "顺劈命中时应写入日志。");
+  assert(summary.remainingEnemy.length === 0, "剧毒顺劈应能清空相邻两个目标。");
+}
+
+function testCombatStartDealAllDamage(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const result = simulateBattle(
+      [createOwnedMinion("siege-colossus")],
+      [createOwnedMinion("shield-bot"), createOwnedMinion("woodland-wolf")]
+    );
+    globalThis.__dealAllSummary = {
+      logs: result.logs,
+      remainingEnemy: result.remainingEnemy.map((minion) => ({
+        name: minion.name,
+        health: minion.health,
+        keywords: [...minion.keywords],
+      })),
+    };
+  `);
+  const summary = harness.run("__dealAllSummary");
+  assert(summary.logs.some((line) => line.includes("对所有敌方随从造成了 1 点伤害")), "群体开战伤害应写入日志。");
+  assert(summary.logs.some((line) => line.includes("圣盾被打掉")), "群体开战伤害应能打掉圣盾。");
+  assert(summary.remainingEnemy.every((minion) => minion.name !== "护盾机器人"), "群体开战伤害后圣盾单位应不再保留圣盾。");
+}
+
+function testBeastCombatStartBuff(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const alpha = createOwnedMinion("thunderhide-alpha");
+    const ally = createOwnedMinion("stone-boar");
+    const enemy = createOwnedMinion("tavern-attendant");
+    const result = simulateBattle([alpha, ally], [enemy]);
+    globalThis.__beastBuffSummary = {
+      logs: result.logs,
+      remainingPlayer: result.remainingPlayer.map((minion) => ({ name: minion.name, attack: minion.attack, health: minion.health })),
+    };
+  `);
+  const summary = harness.run("__beastBuffSummary");
+  const buffedAlpha = summary.remainingPlayer.find((minion) => minion.name === "雷鬃领主");
+  assert(summary.logs.some((line) => line.includes("鼓舞了")), "野兽开战增幅应写入日志。");
+  assert(summary.logs.some((line) => line.includes("赋予 +2/+1")), "野兽开战增幅日志应包含具体数值。");
+  assert(buffedAlpha || summary.remainingPlayer.length >= 1, "野兽开战增幅后的战斗结果应正常结算。");
+}
+
+function testMechGrantDivineShield(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const bastion = createOwnedMinion("ironclad-bastion");
+    const ally = createOwnedMinion("spawn-bot");
+    const enemy = createOwnedMinion("arena-champion");
+    const result = simulateBattle([bastion, ally], [enemy]);
+    globalThis.__mechShieldSummary = {
+      logs: result.logs,
+      remainingPlayer: result.remainingPlayer.map((minion) => ({ name: minion.name, keywords: [...minion.keywords] })),
+    };
+  `);
+  const summary = harness.run("__mechShieldSummary");
+  const ally = summary.remainingPlayer.find((minion) => minion.name === "产线机器人");
+  assert(summary.logs.some((line) => line.includes("施加了圣盾")), "机械授予圣盾应写入日志。");
+  assert(ally && ally.keywords.includes("divineShield"), "机械友军应获得圣盾。");
+}
+
+function testDemonStackedBoardDamage(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const magus = createOwnedMinion("hellfire-magus");
+    const archon = createOwnedMinion("doomfire-archon");
+    const result = simulateBattle(
+      [magus, archon],
+      [createOwnedMinion("woodland-wolf"), createOwnedMinion("murloc-scout"), createOwnedMinion("shield-bot")]
+    );
+    globalThis.__demonDamageSummary = {
+      logs: result.logs,
+      remainingEnemy: result.remainingEnemy.map((minion) => ({ name: minion.name, health: minion.health, keywords: [...minion.keywords] })),
+    };
+  `);
+  const summary = harness.run("__demonDamageSummary");
+  assert(summary.logs.filter((line) => line.includes("对所有敌方随从造成了")).length >= 2, "恶魔体系的群体开战伤害应可叠加触发。");
+  assert(summary.remainingEnemy.every((minion) => minion.name !== "恶魔斥候"), "叠加群伤后低血单位应被优先清掉。");
+}
+
+function testRebornRevivesMinion(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const result = simulateBattle(
+      [createOwnedMinion("crypt-warden")],
+      [createOwnedMinion("arena-champion")]
+    );
+    globalThis.__rebornSummary = {
+      logs: result.logs,
+      remainingPlayer: result.remainingPlayer.map((minion) => ({
+        name: minion.name,
+        health: minion.health,
+        keywords: [...minion.keywords],
+        deathrattle: minion.deathrattle,
+      })),
+    };
+  `);
+  const summary = harness.run("__rebornSummary");
+  const reborned = summary.remainingPlayer.find((minion) => minion.name === "墓窟看守者");
+  assert(summary.logs.some((line) => line.includes("触发复生")), "复生触发时应写入日志。");
+  assert(reborned && reborned.health === 1, "复生后的单位应以 1 点生命回到战场。");
+  assert(reborned && reborned.deathrattle && reborned.deathrattle.type === "summon", "复生不应清掉单位原有亡语。");
+}
+
+function testUndeadGrantReborn(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const summoner = createOwnedMinion("grave-summoner");
+    const ally = createOwnedMinion("soul-devourer");
+    const enemyA = createOwnedMinion("arena-champion");
+    const enemyB = createOwnedMinion("arena-champion");
+    const result = simulateBattle([summoner, ally], [enemyA, enemyB]);
+    globalThis.__undeadGrantRebornSummary = {
+      logs: result.logs,
+    };
+  `);
+  const summary = harness.run("__undeadGrantRebornSummary");
+  assert(summary.logs.some((line) => line.includes("施加了复生")), "冥府唤骨师应能给其他亡灵施加复生。");
+}
+
+function testNecrolordBuffsUndead(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const lord = createOwnedMinion("eternal-necrolord");
+    const ally = createOwnedMinion("bone-fighter");
+    const result = simulateBattle([lord, ally], [createOwnedMinion("tavern-attendant")]);
+    globalThis.__necrolordSummary = {
+      logs: result.logs,
+      remainingPlayer: result.remainingPlayer.map((minion) => ({
+        name: minion.name,
+        attack: minion.attack,
+        health: minion.health,
+      })),
+    };
+  `);
+  const summary = harness.run("__necrolordSummary");
+  const ally = summary.remainingPlayer.find((minion) => minion.name === "白骨短兵");
+  assert(
+    summary.logs.some((line) => line.includes("永夜尸王") && line.includes("亡灵友军") && line.includes("+2/+1")),
+    "永夜尸王应写出亡灵群体增幅日志。"
+  );
+  assert(ally && ally.attack >= 4, "永夜尸王应提升其他亡灵的攻击力。");
+}
+
 function main() {
   const projectRoot = path.resolve(__dirname, "..");
   const tests = [
@@ -283,6 +543,19 @@ function main() {
     ["multiple-triples", testMultipleTriples],
     ["combat-start-dead-minion", testCombatStartDeadMinion],
     ["deathrattle-cap", testDeathrattleSummonCap],
+    ["high-tier-pool-access", testHighTierPoolAccess],
+    ["shop-tier-odds", testShopTierOdds],
+    ["economy-curve", testEconomyCurve],
+    ["enemy-growth-curve", testEnemyGrowthCurve],
+    ["battle-damage-curve", testBattleDamageCurve],
+    ["cleave-poisonous", testCleaveAndPoisonous],
+    ["combat-start-deal-all", testCombatStartDealAllDamage],
+    ["beast-combat-start-buff", testBeastCombatStartBuff],
+    ["mech-grant-divine-shield", testMechGrantDivineShield],
+    ["demon-stacked-board-damage", testDemonStackedBoardDamage],
+    ["reborn-revives-minion", testRebornRevivesMinion],
+    ["undead-grant-reborn", testUndeadGrantReborn],
+    ["necrolord-buffs-undead", testNecrolordBuffsUndead],
   ];
 
   tests.forEach(([name, test]) => {

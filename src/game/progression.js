@@ -1,6 +1,6 @@
 function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard) {
   state.turn += 1;
-  state.gold = Math.min(10, state.turn + 2);
+  state.gold = getTurnGold(state.turn);
   state.shop = state.shopFrozen ? refillShop(state.shop, state.tavernTier) : generateShop(state.tavernTier);
   state.shopFrozen = false;
   state.enemyBoard = generateEnemyBoard(state.turn);
@@ -21,8 +21,8 @@ function upgradeTavernState(state, upgradeCosts, generateShop) {
 }
 
 function generateEnemyBoard(turn, pickRandom, randomInt) {
-  const enemyTier = Math.min(Math.min(MAX_TAVERN_TIER, ENEMY_BOARD_RULES.tierCap), 1 + Math.floor((turn - 1) / 2));
-  const baseSize = Math.min(BOARD_LIMIT, 1 + Math.floor((turn - 1) / 2));
+  const enemyTier = getEnemyBoardTier(turn);
+  const baseSize = getEnemyBoardBaseSize(turn);
   const size = Math.min(
     BOARD_LIMIT,
     baseSize +
@@ -30,11 +30,13 @@ function generateEnemyBoard(turn, pickRandom, randomInt) {
         ? randomInt(0, ENEMY_BOARD_RULES.extraSizeRollMax)
         : 0)
   );
-  const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier <= enemyTier);
   const board = [];
 
   for (let index = 0; index < size; index += 1) {
-    const minion = createOwnedMinion(pickRandom(candidates).id);
+    const minionTier = pickTierByOdds(ENEMY_TIER_ODDS[enemyTier], pickRandom);
+    const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier === minionTier);
+    const fallback = MINION_POOL.filter((minion) => !minion.token && minion.tier <= enemyTier);
+    const minion = createOwnedMinion(pickRandom(candidates.length ? candidates : fallback).id);
     board.push(minion);
   }
   return board;

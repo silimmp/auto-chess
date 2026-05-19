@@ -50,8 +50,7 @@ function buyMinionState(state, shopIndex) {
 
 function generateShop(maxTier, pickRandom) {
   const effectiveTier = Math.min(maxTier, CONTENT_TIER_CAP);
-  const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier <= effectiveTier);
-  return Array.from({ length: SHOP_SLOTS }, () => cloneTemplate(pickRandom(candidates)));
+  return Array.from({ length: SHOP_SLOTS }, () => cloneTemplate(pickShopMinion(effectiveTier, pickRandom)));
 }
 
 function refillShop(currentShop, maxTier, pickRandom) {
@@ -61,4 +60,26 @@ function refillShop(currentShop, maxTier, pickRandom) {
     return filledShop;
   }
   return [...filledShop, ...generateShop(maxTier, pickRandom).slice(0, missing)];
+}
+
+function pickShopMinion(effectiveTier, pickRandom) {
+  const tier = pickTierByOdds(SHOP_TIER_ODDS[effectiveTier], pickRandom);
+  const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier === tier);
+  if (candidates.length) {
+    return pickRandom(candidates);
+  }
+  const fallback = MINION_POOL.filter((minion) => !minion.token && minion.tier <= effectiveTier);
+  return pickRandom(fallback);
+}
+
+function pickTierByOdds(odds, pickRandom) {
+  const entries = Object.entries(odds);
+  const bag = [];
+  entries.forEach(([tier, weight]) => {
+    const count = Math.max(1, Math.round(weight * 100));
+    for (let index = 0; index < count; index += 1) {
+      bag.push(Number(tier));
+    }
+  });
+  return pickRandom(bag);
 }

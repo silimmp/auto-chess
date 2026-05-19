@@ -220,9 +220,7 @@ function startGameApp() {
 
     const intro = trigger === "timer" ? "准备时间结束，自动进入战斗。" : "你提前结束了准备阶段。";
     const result = simulateBattle(state.board, state.enemyBoard);
-    const damage = result.winner === "enemy"
-      ? Math.max(1, result.remainingEnemy.reduce((sum, minion) => sum + minion.tier, 0))
-      : 0;
+    const damage = result.winner === "enemy" ? calculateBattleDamage(result.remainingEnemy) : 0;
     const roundMessage =
       result.winner === "player"
         ? "这回合打赢了。"

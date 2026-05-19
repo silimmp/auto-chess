@@ -32,6 +32,7 @@ function simulateBattle(playerBoard, enemyBoard) {
     const attacker = attackers[attackerIndex];
     const defenderIndex = chooseTargetIndex(defenders);
     const defender = defenders[defenderIndex];
+    const cleaveTarget = getCleaveTarget(defenders, defenderIndex, attacker);
     const progress = `第 ${exchange} 次交锋`;
     const attackMessage = `${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。`;
     const defenderSide = attackerSide === "player" ? "enemy" : "player";
@@ -45,14 +46,18 @@ function simulateBattle(playerBoard, enemyBoard) {
       delay: BATTLE_ACTION_DELAY_MS,
     });
 
-    const attackerDamageNote = applyDamage(attacker, defender.attack);
-    const defenderDamageNote = applyDamage(defender, attacker.attack);
+    const attackerDamageNote = applyDamage(attacker, defender.attack, defender);
+    const defenderDamageNote = applyDamage(defender, attacker.attack, attacker);
+    const hitIds = [attacker.instanceId, defender.instanceId];
+    if (cleaveTarget) {
+      hitIds.push(cleaveTarget.instanceId);
+    }
     pushBattleFrameOnly(player, enemy, frames, {
       attackerId: attacker.instanceId,
       defenderId: defender.instanceId,
       attackerSide,
       defenderSide,
-      hitIds: [attacker.instanceId, defender.instanceId],
+      hitIds,
       progress,
       delay: BATTLE_HIT_DELAY_MS,
     });
@@ -71,6 +76,32 @@ function simulateBattle(playerBoard, enemyBoard) {
       defenderSide,
       progress,
     });
+    if (cleaveTarget) {
+      const cleaveNote = applyDamage(cleaveTarget, attacker.attack, attacker);
+      pushBattleLogFrame(
+        player,
+        enemy,
+        logs,
+        frames,
+        `${attacker.name} 的顺劈波及了 ${cleaveTarget.name}。`,
+        {
+          attackerId: attacker.instanceId,
+          defenderId: cleaveTarget.instanceId,
+          attackerSide,
+          defenderSide,
+          hitIds: [cleaveTarget.instanceId],
+          progress,
+          delay: BATTLE_HIT_DELAY_MS,
+        }
+      );
+      recordShieldBreak(cleaveNote, cleaveTarget, player, enemy, logs, frames, {
+        attackerId: attacker.instanceId,
+        defenderId: cleaveTarget.instanceId,
+        attackerSide,
+        defenderSide,
+        progress,
+      });
+    }
 
     cleanupBattlefield(player, enemy, logs, frames, progress);
 
@@ -101,7 +132,7 @@ function simulateBattle(playerBoard, enemyBoard) {
   };
 }
 
-function applyDamage(target, amount) {
+function applyDamage(target, amount, source = null) {
   if (target.health <= 0 || amount <= 0) {
     return "none";
   }
@@ -111,8 +142,24 @@ function applyDamage(target, amount) {
     return "shield";
   }
 
+  if (source && source.keywords.includes("poisonous")) {
+    target.health = 0;
+    return "poisoned";
+  }
+
   target.health -= amount;
   return "damaged";
+}
+
+function getCleaveTarget(board, defenderIndex, attacker) {
+  if (!attacker.keywords.includes("cleave")) {
+    return null;
+  }
+  if (defenderIndex + 1 >= board.length) {
+    return null;
+  }
+  const target = board[defenderIndex + 1];
+  return target && target.health > 0 ? target : null;
 }
 
 function cleanupBattlefield(player, enemy, logs, frames, progress) {
@@ -136,6 +183,11 @@ function removeDefeatedMinions(board, opposingBoard, player, enemy, side, logs, 
       delay: BATTLE_CLEANUP_DELAY_MS,
     });
 
+    if (tryResolveReborn(board, index, minion, player, enemy, side, logs, frames, progress)) {
+      index += 1;
+      continue;
+    }
+
     const summons = buildDeathrattleSummons(board, minion);
     board.splice(index, 1, ...summons);
     pushBattleFrameOnly(player, enemy, frames, {
@@ -153,6 +205,24 @@ function removeDefeatedMinions(board, opposingBoard, player, enemy, side, logs, 
 
     index += summons.length;
   }
+}
+
+function tryResolveReborn(board, index, minion, player, enemy, side, logs, frames, progress) {
+  if (!minion.keywords.includes("reborn") || minion.reborn?.used) {
+    return false;
+  }
+
+  minion.health = 1;
+  minion.reborn = { ...(minion.reborn || {}), used: true };
+  minion.keywords = minion.keywords.filter((keyword) => keyword !== "reborn");
+  board.splice(index, 1, minion);
+  pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(side)} ${minion.name} 触发复生，再次回到了战场。`, {
+    defeatedIds: [],
+    hitIds: [minion.instanceId],
+    progress,
+    delay: BATTLE_CLEANUP_DELAY_MS,
+  });
+  return true;
 }
 
 function pushBattleLogFrame(player, enemy, logs, frames, message, options = {}) {

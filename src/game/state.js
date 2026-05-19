@@ -9,6 +9,7 @@ function createElements() {
     timerCard: document.querySelector("#timer-card"),
     message: document.querySelector("#message-value"),
     shop: document.querySelector("#shop-board"),
+    shopOdds: document.querySelector("#shop-odds-value"),
     hand: document.querySelector("#hand-board"),
     board: document.querySelector("#player-board"),
     prepPanel: document.querySelector(".prep-panel"),
@@ -35,7 +36,7 @@ function createInitialState(generateShop, generateEnemyBoard, pickRandom, random
   const initial = {
     turn: 1,
     hp: 30,
-    gold: 3,
+    gold: getTurnGold(1),
     tavernTier: 1,
     phase: "prep",
     timeLeft: getPrepDuration(1),

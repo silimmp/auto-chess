@@ -18,6 +18,9 @@ function renderGame({
   elements.hp.textContent = Math.max(0, state.hp);
   elements.tier.textContent = state.tavernTier;
   elements.phase.textContent = getPhaseLabel(state.phase);
+  if (elements.shopOdds) {
+    elements.shopOdds.textContent = formatTierOdds(SHOP_TIER_ODDS[state.tavernTier]);
+  }
   syncTimerDisplay(state, elements);
   elements.message.textContent = state.message;
   elements.battleView.classList.toggle("hidden", isPrep);
@@ -53,6 +56,12 @@ function syncButtons(state, elements) {
   elements.refreshBtn.textContent = `刷新（${REFRESH_COST} 金）`;
   elements.freezeBtn.textContent = state.shopFrozen ? "已冻结" : "冻结";
   elements.freezeBtn.classList.toggle("frozen", state.shopFrozen);
+}
+
+function formatTierOdds(odds) {
+  return Object.entries(odds)
+    .map(([tier, weight]) => `${tier} 星 ${Math.round(weight * 100)}%`)
+    .join(" · ");
 }
 
 function renderShop(state, elements, bindPrepCardInteractions) {

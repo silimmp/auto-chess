@@ -25,6 +25,10 @@ function buildMinionCard(minion, options = {}) {
           ? "keyword taunt"
           : keyword === "divineShield"
             ? "keyword shield"
+            : keyword === "poisonous"
+              ? "keyword shield"
+              : keyword === "cleave"
+                ? "keyword taunt"
             : "keyword";
       return `<span class="${className}">${label}</span>`;
     })
@@ -97,6 +101,15 @@ function getKeywordLabel(keyword) {
   }
   if (keyword === "deathrattle") {
     return "亡语";
+  }
+  if (keyword === "reborn") {
+    return "复生";
+  }
+  if (keyword === "poisonous") {
+    return "剧毒";
+  }
+  if (keyword === "cleave") {
+    return "顺劈";
   }
   return keyword;
 }
