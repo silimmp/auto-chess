@@ -62,14 +62,14 @@ function simulateBattle(playerBoard, enemyBoard) {
       delay: BATTLE_HIT_DELAY_MS,
     });
 
-    recordShieldBreak(attackerDamageNote, attacker, player, enemy, logs, frames, {
+    recordPostDamageEffects(attackerDamageNote, attacker, player, enemy, logs, frames, {
       attackerId: attacker.instanceId,
       defenderId: defender.instanceId,
       attackerSide,
       defenderSide,
       progress,
     });
-    recordShieldBreak(defenderDamageNote, defender, player, enemy, logs, frames, {
+    recordPostDamageEffects(defenderDamageNote, defender, player, enemy, logs, frames, {
       attackerId: attacker.instanceId,
       defenderId: defender.instanceId,
       attackerSide,
@@ -94,7 +94,7 @@ function simulateBattle(playerBoard, enemyBoard) {
           delay: BATTLE_HIT_DELAY_MS,
         }
       );
-      recordShieldBreak(cleaveNote, cleaveTarget, player, enemy, logs, frames, {
+      recordPostDamageEffects(cleaveNote, cleaveTarget, player, enemy, logs, frames, {
         attackerId: attacker.instanceId,
         defenderId: cleaveTarget.instanceId,
         attackerSide,
@@ -232,6 +232,11 @@ function pushBattleLogFrame(player, enemy, logs, frames, message, options = {}) 
 
 function pushBattleFrameOnly(player, enemy, frames, options = {}) {
   frames.push(createBattleFrame(player, enemy, options));
+}
+
+function recordPostDamageEffects(note, target, player, enemy, logs, frames, options = {}) {
+  recordShieldBreak(note, target, player, enemy, logs, frames, options);
+  resolveDamageTrigger(note, target, player, enemy, logs, frames, options);
 }
 
 function recordShieldBreak(note, target, player, enemy, logs, frames, options = {}) {

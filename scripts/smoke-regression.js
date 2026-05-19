@@ -535,6 +535,67 @@ function testNecrolordBuffsUndead(projectRoot) {
   assert(ally && ally.attack >= 4, "永夜尸王应提升其他亡灵的攻击力。");
 }
 
+function testOrcDamageTriggers(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const brute = createOwnedMinion("bloodfury-brute");
+    const enemy = createOwnedMinion("taunt-guard");
+    const result = simulateBattle([brute], [enemy]);
+    globalThis.__orcDamageTriggerSummary = {
+      logs: result.logs,
+      remainingPlayer: result.remainingPlayer.map((minion) => ({
+        name: minion.name,
+        attack: minion.attack,
+        health: minion.health,
+      })),
+    };
+  `);
+  const summary = harness.run("__orcDamageTriggerSummary");
+  const brute = summary.remainingPlayer.find((minion) => minion.name === "血怒蛮王");
+  assert(summary.logs.some((line) => line.includes("受伤后激怒")), "兽人受伤成长应写入日志。");
+  assert(brute && brute.attack >= 8, "兽人前排受伤后应提升攻击力。");
+}
+
+function testHumanFormationBuffs(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const captain = createOwnedMinion("dawnshield-captain");
+    const lancer = createOwnedMinion("royal-lancer");
+    const result = simulateBattle([captain, lancer], [createOwnedMinion("tavern-attendant")]);
+    globalThis.__humanFormationSummary = {
+      logs: result.logs,
+      remainingPlayer: result.remainingPlayer.map((minion) => ({
+        name: minion.name,
+        attack: minion.attack,
+        health: minion.health,
+        keywords: [...minion.keywords],
+      })),
+    };
+  `);
+  const summary = harness.run("__humanFormationSummary");
+  const lancer = summary.remainingPlayer.find((minion) => minion.name === "王城枪兵");
+  assert(summary.logs.some((line) => line.includes("人类友军") && line.includes("+1/+2")), "人类阵线增幅应写入日志。");
+  assert(lancer && lancer.health >= 5, "人类友军应获得曙光盾卫队长的体质增幅。");
+}
+
+function testElfRepeatedShots(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const watcher = createOwnedMinion("astral-waywatcher");
+    const result = simulateBattle(
+      [watcher],
+      [createOwnedMinion("woodland-wolf"), createOwnedMinion("murloc-scout"), createOwnedMinion("tavern-attendant")]
+    );
+    globalThis.__elfShotSummary = {
+      logs: result.logs,
+      remainingEnemy: result.remainingEnemy.map((minion) => minion.name),
+    };
+  `);
+  const summary = harness.run("__elfShotSummary");
+  assert(summary.logs.filter((line) => line.includes("第 1 次射击") || line.includes("第 2 次射击") || line.includes("第 3 次射击")).length >= 3, "精灵多段点杀应逐次写入日志。");
+  assert(summary.remainingEnemy.length <= 1, "高星精灵多段点杀后应显著削减敌方阵容。");
+}
+
 function main() {
   const projectRoot = path.resolve(__dirname, "..");
   const tests = [
@@ -556,6 +617,9 @@ function main() {
     ["reborn-revives-minion", testRebornRevivesMinion],
     ["undead-grant-reborn", testUndeadGrantReborn],
     ["necrolord-buffs-undead", testNecrolordBuffsUndead],
+    ["orc-damage-triggers", testOrcDamageTriggers],
+    ["human-formation-buffs", testHumanFormationBuffs],
+    ["elf-repeated-shots", testElfRepeatedShots],
   ];
 
   tests.forEach(([name, test]) => {

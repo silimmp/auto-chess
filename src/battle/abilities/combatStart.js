@@ -33,6 +33,7 @@ function resolveCombatStartAbility(context) {
   const handlers = {
     "buff-friendly-tribe": resolveBuffFriendlyTribeCombatStart,
     "deal-random-damage": resolveDealRandomDamageCombatStart,
+    "deal-random-damage-repeat": resolveDealRandomDamageRepeatCombatStart,
     "deal-all-damage": resolveDealAllDamageCombatStart,
     "grant-keyword-friendly-tribe": resolveGrantKeywordFriendlyTribeCombatStart,
   };
@@ -44,42 +45,59 @@ function resolveCombatStartAbility(context) {
 }
 
 function resolveDealRandomDamageCombatStart(context) {
+  return resolveRepeatedRandomDamageCombatStart(context, context.source.combatStart.shots ?? 1);
+}
+
+function resolveDealRandomDamageRepeatCombatStart(context) {
+  return resolveRepeatedRandomDamageCombatStart(context, context.source.combatStart.shots ?? 1);
+}
+
+function resolveRepeatedRandomDamageCombatStart(context, shots) {
   const { source, side, targets, player, enemy, logs, frames, progress } = context;
-  const livingTargets = targets.filter((minion) => minion.health > 0);
-  if (!livingTargets.length) {
-    return false;
+  const amount = source.combatStart.amount ?? 0;
+  const defenderSide = side === "player" ? "enemy" : "player";
+  let triggered = false;
+
+  for (let shot = 0; shot < shots; shot += 1) {
+    const livingTargets = targets.filter((minion) => minion.health > 0);
+    if (!livingTargets.length) {
+      break;
+    }
+
+    const target = pickRandom(livingTargets);
+    const message =
+      shots > 1
+        ? `${source.name} 在战斗开始时第 ${shot + 1} 次射击命中 ${target.name}，造成 ${amount} 点伤害。`
+        : `${source.name} 在战斗开始时命中 ${target.name}，造成 ${amount} 点伤害。`;
+    pushBattleLogFrame(player, enemy, logs, frames, message, {
+      attackerId: source.instanceId,
+      defenderId: target.instanceId,
+      attackerSide: side,
+      defenderSide,
+      progress,
+      delay: BATTLE_ACTION_DELAY_MS,
+    });
+    const note = applyDamage(target, amount);
+    pushBattleFrameOnly(player, enemy, frames, {
+      attackerId: source.instanceId,
+      defenderId: target.instanceId,
+      attackerSide: side,
+      defenderSide,
+      hitIds: [target.instanceId],
+      progress,
+      delay: BATTLE_HIT_DELAY_MS,
+    });
+    recordPostDamageEffects(note, target, player, enemy, logs, frames, {
+      attackerId: source.instanceId,
+      defenderId: target.instanceId,
+      attackerSide: side,
+      defenderSide,
+      progress,
+    });
+    triggered = true;
   }
 
-  const target = pickRandom(livingTargets);
-  const amount = source.combatStart.amount ?? 0;
-  const message = `${source.name} 在战斗开始时命中 ${target.name}，造成 ${amount} 点伤害。`;
-  const defenderSide = side === "player" ? "enemy" : "player";
-  pushBattleLogFrame(player, enemy, logs, frames, message, {
-    attackerId: source.instanceId,
-    defenderId: target.instanceId,
-    attackerSide: side,
-    defenderSide,
-    progress,
-    delay: BATTLE_ACTION_DELAY_MS,
-  });
-  const note = applyDamage(target, amount);
-  pushBattleFrameOnly(player, enemy, frames, {
-    attackerId: source.instanceId,
-    defenderId: target.instanceId,
-    attackerSide: side,
-    defenderSide,
-    hitIds: [target.instanceId],
-    progress,
-    delay: BATTLE_HIT_DELAY_MS,
-  });
-  recordShieldBreak(note, target, player, enemy, logs, frames, {
-    attackerId: source.instanceId,
-    defenderId: target.instanceId,
-    attackerSide: side,
-    defenderSide,
-    progress,
-  });
-  return true;
+  return triggered;
 }
 
 function resolveBuffFriendlyTribeCombatStart(context) {
@@ -134,7 +152,7 @@ function resolveDealAllDamageCombatStart(context) {
 
   livingTargets.forEach((target) => {
     const note = applyDamage(target, amount, source);
-    recordShieldBreak(note, target, player, enemy, logs, frames, {
+    recordPostDamageEffects(note, target, player, enemy, logs, frames, {
       attackerId: source.instanceId,
       defenderId: target.instanceId,
       attackerSide: side,
