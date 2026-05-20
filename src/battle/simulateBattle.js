@@ -7,6 +7,9 @@ function simulateBattle(playerBoard, enemyBoard) {
   resolveCombatStartEffects(player, enemy, logs, frames);
 
   let attackerSide = chooseStartingSide(player, enemy);
+  markInitialAssaults(player);
+  markInitialAssaults(enemy);
+  resolvePendingAssaults(player, enemy, logs, frames, attackerSide, COMBAT_START_PROGRESS_LABEL);
   let playerPointer = 0;
   let enemyPointer = 0;
   let turns = 0;
@@ -30,80 +33,8 @@ function simulateBattle(playerBoard, enemyBoard) {
     }
 
     const attacker = attackers[attackerIndex];
-    const defenderIndex = chooseTargetIndex(defenders);
-    const defender = defenders[defenderIndex];
-    const cleaveTarget = getCleaveTarget(defenders, defenderIndex, attacker);
     const progress = `第 ${exchange} 次交锋`;
-    const attackMessage = `${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。`;
-    const defenderSide = attackerSide === "player" ? "enemy" : "player";
-
-    pushBattleLogFrame(player, enemy, logs, frames, attackMessage, {
-      attackerId: attacker.instanceId,
-      defenderId: defender.instanceId,
-      attackerSide,
-      defenderSide,
-      progress,
-      delay: BATTLE_ACTION_DELAY_MS,
-    });
-
-    const attackerDamageNote = applyDamage(attacker, defender.attack, defender);
-    const defenderDamageNote = applyDamage(defender, attacker.attack, attacker);
-    const hitIds = [attacker.instanceId, defender.instanceId];
-    if (cleaveTarget) {
-      hitIds.push(cleaveTarget.instanceId);
-    }
-    pushBattleFrameOnly(player, enemy, frames, {
-      attackerId: attacker.instanceId,
-      defenderId: defender.instanceId,
-      attackerSide,
-      defenderSide,
-      hitIds,
-      progress,
-      delay: BATTLE_HIT_DELAY_MS,
-    });
-
-    recordPostDamageEffects(attackerDamageNote, attacker, player, enemy, logs, frames, {
-      attackerId: attacker.instanceId,
-      defenderId: defender.instanceId,
-      attackerSide,
-      defenderSide,
-      progress,
-    });
-    recordPostDamageEffects(defenderDamageNote, defender, player, enemy, logs, frames, {
-      attackerId: attacker.instanceId,
-      defenderId: defender.instanceId,
-      attackerSide,
-      defenderSide,
-      progress,
-    });
-    if (cleaveTarget) {
-      const cleaveNote = applyDamage(cleaveTarget, attacker.attack, attacker);
-      pushBattleLogFrame(
-        player,
-        enemy,
-        logs,
-        frames,
-        `${attacker.name} 的顺劈波及了 ${cleaveTarget.name}。`,
-        {
-          attackerId: attacker.instanceId,
-          defenderId: cleaveTarget.instanceId,
-          attackerSide,
-          defenderSide,
-          hitIds: [cleaveTarget.instanceId],
-          progress,
-          delay: BATTLE_HIT_DELAY_MS,
-        }
-      );
-      recordPostDamageEffects(cleaveNote, cleaveTarget, player, enemy, logs, frames, {
-        attackerId: attacker.instanceId,
-        defenderId: cleaveTarget.instanceId,
-        attackerSide,
-        defenderSide,
-        progress,
-      });
-    }
-
-    cleanupBattlefield(player, enemy, logs, frames, progress);
+    performAttackSequence(player, enemy, logs, frames, attackerSide, attacker.instanceId, progress);
 
     attackerSide = attackerSide === "player" ? "enemy" : "player";
     turns += 1;
@@ -132,9 +63,167 @@ function simulateBattle(playerBoard, enemyBoard) {
   };
 }
 
-function applyDamage(target, amount, source = null) {
+function performAttackSequence(player, enemy, logs, frames, attackerSide, attackerId, progress) {
+  const comboLimit = hasLivingKeywordUnit(attackerId, attackerSide, player, enemy, "combo") ? 2 : 1;
+  let attackCount = 0;
+
+  for (let comboIndex = 0; comboIndex < comboLimit; comboIndex += 1) {
+    const attackers = attackerSide === "player" ? player : enemy;
+    const defenders = attackerSide === "player" ? enemy : player;
+    if (!defenders.length) {
+      break;
+    }
+
+    const attacker = attackers.find((minion) => minion.instanceId === attackerId && minion.health > 0);
+    if (!attacker || attacker.attack <= 0) {
+      break;
+    }
+
+    if (comboIndex > 0) {
+      pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(attackerSide)} ${attacker.name} 发动连击，再次发起攻击。`, {
+        attackerId: attacker.instanceId,
+        attackerSide,
+        progress,
+        delay: BATTLE_ACTION_DELAY_MS,
+      });
+    }
+
+    performSingleAttack(player, enemy, logs, frames, attackerSide, attacker, progress);
+    attackCount += 1;
+  }
+
+  return attackCount;
+}
+
+function performSingleAttack(player, enemy, logs, frames, attackerSide, attacker, progress) {
+  const defenders = attackerSide === "player" ? enemy : player;
+  const defenderIndex = chooseTargetIndex(defenders);
+  const defender = defenders[defenderIndex];
+  const splashTargets = getAttackSplashTargets(defenders, defenderIndex, attacker);
+  const defenderSide = attackerSide === "player" ? "enemy" : "player";
+  const attackMessage = `${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。`;
+  const battleContext = { player, enemy, logs, frames };
+
+  pushBattleLogFrame(player, enemy, logs, frames, attackMessage, {
+    attackerId: attacker.instanceId,
+    defenderId: defender.instanceId,
+    attackerSide,
+    defenderSide,
+    progress,
+    delay: BATTLE_ACTION_DELAY_MS,
+  });
+
+  const attackerDamageOptions = {
+    attackerId: defender.instanceId,
+    defenderId: attacker.instanceId,
+    attackerSide: defenderSide,
+    defenderSide: attackerSide,
+    progress,
+  };
+  const defenderDamageOptions = {
+    attackerId: attacker.instanceId,
+    defenderId: defender.instanceId,
+    attackerSide,
+    defenderSide,
+    progress,
+  };
+  const attackerDamageNote = applyDamage(attacker, defender.attack, defender, battleContext, attackerDamageOptions);
+  const defenderDamageNote = applyDamage(defender, attacker.attack, attacker, battleContext, defenderDamageOptions);
+  pushBattleFrameOnly(player, enemy, frames, {
+    attackerId: attacker.instanceId,
+    defenderId: defender.instanceId,
+    attackerSide,
+    defenderSide,
+    hitIds: [attacker.instanceId, defender.instanceId, ...splashTargets.map((target) => target.instanceId)],
+    progress,
+    delay: BATTLE_HIT_DELAY_MS,
+  });
+
+  recordPostDamageEffects(attackerDamageNote, attacker, player, enemy, logs, frames, attackerDamageOptions);
+  recordPostDamageEffects(defenderDamageNote, defender, player, enemy, logs, frames, defenderDamageOptions);
+
+  if (splashTargets.length) {
+    const splashLabel = attacker.keywords.includes("sweep") ? "横扫" : "顺劈";
+    const splashNames = splashTargets.map((target) => target.name).join("、");
+    pushBattleLogFrame(player, enemy, logs, frames, `${attacker.name} 的${splashLabel}波及了 ${splashNames}。`, {
+      attackerId: attacker.instanceId,
+      defenderId: splashTargets[0].instanceId,
+      attackerSide,
+      defenderSide,
+      hitIds: splashTargets.map((target) => target.instanceId),
+      progress,
+      delay: BATTLE_HIT_DELAY_MS,
+    });
+
+    splashTargets.forEach((target) => {
+      const splashNote = applyDamage(target, attacker.attack, attacker, battleContext, {
+        attackerId: attacker.instanceId,
+        defenderId: target.instanceId,
+        attackerSide,
+        defenderSide,
+        progress,
+      });
+      recordPostDamageEffects(splashNote, target, player, enemy, logs, frames, {
+        attackerId: attacker.instanceId,
+        defenderId: target.instanceId,
+        attackerSide,
+        defenderSide,
+        progress,
+      });
+    });
+  }
+
+  cleanupBattlefield(player, enemy, logs, frames, progress);
+  resolvePendingAssaults(player, enemy, logs, frames, attackerSide, progress);
+}
+
+function applyDamage(target, amount, source = null, battleContext = null, options = {}) {
   if (target.health <= 0 || amount <= 0) {
     return "none";
+  }
+
+  if (battleContext && options.allowBarrier !== false) {
+    const protector = getBarrierProtector(target, battleContext.player, battleContext.enemy);
+    const redirected = protector ? Math.floor(amount / 2) : 0;
+    if (protector && redirected > 0) {
+      const defenderSide = getMinionSide(target, battleContext.player, battleContext.enemy);
+      const protectorNote = applyDamage(protector, redirected, source, battleContext, {
+        ...options,
+        allowBarrier: false,
+      });
+      pushBattleLogFrame(
+        battleContext.player,
+        battleContext.enemy,
+        battleContext.logs,
+        battleContext.frames,
+        `${getSideLabel(defenderSide)} ${protector.name} 以壁垒为 ${target.name} 分担了 ${redirected} 点伤害。`,
+        {
+          attackerId: options.attackerId ?? (source ? source.instanceId : null),
+          defenderId: protector.instanceId,
+          attackerSide: options.attackerSide ?? "",
+          defenderSide,
+          hitIds: [protector.instanceId],
+          progress: options.progress,
+          delay: BATTLE_HIT_DELAY_MS,
+        }
+      );
+      recordPostDamageEffects(
+        protectorNote,
+        protector,
+        battleContext.player,
+        battleContext.enemy,
+        battleContext.logs,
+        battleContext.frames,
+        {
+          attackerId: options.attackerId ?? (source ? source.instanceId : null),
+          defenderId: protector.instanceId,
+          attackerSide: options.attackerSide ?? "",
+          defenderSide,
+          progress: options.progress,
+        }
+      );
+      amount -= redirected;
+    }
   }
 
   if (target.keywords.includes("divineShield")) {
@@ -151,15 +240,25 @@ function applyDamage(target, amount, source = null) {
   return "damaged";
 }
 
-function getCleaveTarget(board, defenderIndex, attacker) {
-  if (!attacker.keywords.includes("cleave")) {
-    return null;
+function getAttackSplashTargets(board, defenderIndex, attacker) {
+  const targetIds = new Set();
+
+  if (attacker.keywords.includes("cleave")) {
+    const cleaveTarget = board[defenderIndex + 1];
+    if (cleaveTarget && cleaveTarget.health > 0) {
+      targetIds.add(cleaveTarget.instanceId);
+    }
   }
-  if (defenderIndex + 1 >= board.length) {
-    return null;
+
+  if (attacker.keywords.includes("sweep")) {
+    [board[defenderIndex - 1], board[defenderIndex + 1]].forEach((target) => {
+      if (target && target.health > 0) {
+        targetIds.add(target.instanceId);
+      }
+    });
   }
-  const target = board[defenderIndex + 1];
-  return target && target.health > 0 ? target : null;
+
+  return board.filter((minion) => targetIds.has(minion.instanceId));
 }
 
 function cleanupBattlefield(player, enemy, logs, frames, progress) {
@@ -201,6 +300,7 @@ function tryResolveReborn(board, index, minion, player, enemy, side, logs, frame
   minion.reborn = { ...(minion.reborn || {}), used: true };
   minion.keywords = minion.keywords.filter((keyword) => keyword !== "reborn");
   board.splice(index, 1, minion);
+  markPendingAssault(minion);
   pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(side)} ${minion.name} 触发复生，再次回到了战场。`, {
     defeatedIds: [],
     hitIds: [minion.instanceId],
@@ -242,6 +342,84 @@ function getSideLabel(side) {
 
 function getOpposingSideLabel(side) {
   return side === "player" ? "敌方" : "我方";
+}
+
+function getMinionSide(target, player, enemy) {
+  return player.some((minion) => minion.instanceId === target.instanceId) ? "player" : "enemy";
+}
+
+function getBarrierProtector(target, player, enemy) {
+  const board = getMinionSide(target, player, enemy) === "player" ? player : enemy;
+  const index = board.findIndex((minion) => minion.instanceId === target.instanceId);
+  if (index === -1) {
+    return null;
+  }
+
+  return [board[index - 1], board[index + 1]].find(
+    (minion) => minion && minion.health > 0 && minion.keywords.includes("barrier")
+  ) || null;
+}
+
+function markInitialAssaults(board) {
+  board.forEach((minion) => {
+    if (minion.health > 0) {
+      markPendingAssault(minion);
+    }
+  });
+}
+
+function markPendingAssault(minion) {
+  if (minion.health > 0 && minion.keywords.includes("assault")) {
+    minion.pendingAssault = true;
+  }
+}
+
+function resolvePendingAssaults(player, enemy, logs, frames, preferredSide, progress) {
+  while (true) {
+    const next = findPendingAssault(player, enemy, preferredSide);
+    if (!next) {
+      return;
+    }
+
+    next.minion.pendingAssault = false;
+    const opposingBoard = next.side === "player" ? enemy : player;
+    if (next.minion.health <= 0 || next.minion.attack <= 0 || !opposingBoard.length) {
+      continue;
+    }
+
+    pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(next.side)} ${next.minion.name} 触发狂袭，立即发起攻击。`, {
+      attackerId: next.minion.instanceId,
+      attackerSide: next.side,
+      progress,
+      delay: BATTLE_ACTION_DELAY_MS,
+    });
+    performAttackSequence(player, enemy, logs, frames, next.side, next.minion.instanceId, progress);
+  }
+}
+
+function findPendingAssault(player, enemy, preferredSide) {
+  const firstBoard = preferredSide === "enemy" ? enemy : player;
+  const secondBoard = preferredSide === "enemy" ? player : enemy;
+  const firstSide = preferredSide === "enemy" ? "enemy" : "player";
+  const secondSide = preferredSide === "enemy" ? "player" : "enemy";
+  const first = firstBoard.find((minion) => minion.pendingAssault && minion.health > 0);
+  if (first) {
+    return { minion: first, side: firstSide };
+  }
+
+  const second = secondBoard.find((minion) => minion.pendingAssault && minion.health > 0);
+  if (second) {
+    return { minion: second, side: secondSide };
+  }
+
+  return null;
+}
+
+function hasLivingKeywordUnit(attackerId, side, player, enemy, keyword) {
+  const board = side === "player" ? player : enemy;
+  return board.some(
+    (minion) => minion.instanceId === attackerId && minion.health > 0 && minion.keywords.includes(keyword)
+  );
 }
 
 function pickRandom(list) {

@@ -54,6 +54,9 @@ function resolveDeathrattle(board, opposingBoard, index, minion, player, enemy, 
 
 function resolveSummonDeathrattle(board, opposingBoard, index, minion, player, enemy, side, logs, frames, progress) {
   const summons = buildDeathrattleSummons(board, minion);
+  summons.forEach((summon) => {
+    markPendingAssault(summon);
+  });
   board.splice(index, 1, ...summons);
   pushBattleFrameOnly(player, enemy, frames, {
     progress,
@@ -107,6 +110,7 @@ function resolveDealRandomDamageDeathrattle(board, opposingBoard, index, minion,
   const amount = minion.deathrattle.amount ?? 0;
   const attackerSide = side;
   const defenderSide = side === "player" ? "enemy" : "player";
+  const battleContext = { player, enemy, logs, frames };
 
   pushBattleFrameOnly(player, enemy, frames, {
     progress,
@@ -131,7 +135,13 @@ function resolveDealRandomDamageDeathrattle(board, opposingBoard, index, minion,
       progress,
       delay: BATTLE_ACTION_DELAY_MS,
     });
-    const note = applyDamage(target, amount, minion);
+    const note = applyDamage(target, amount, minion, battleContext, {
+      attackerId: minion.instanceId,
+      defenderId: target.instanceId,
+      attackerSide,
+      defenderSide,
+      progress,
+    });
     pushBattleFrameOnly(player, enemy, frames, {
       attackerId: minion.instanceId,
       defenderId: target.instanceId,

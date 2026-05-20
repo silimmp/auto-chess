@@ -69,6 +69,7 @@ function resolveDealRandomDamageWhenDamaged(target, player, enemy, logs, frames,
   const amount = target.damageTrigger.amount ?? 0;
   const victim = pickRandom(livingTargets);
   const defenderSide = sideContext.side === "player" ? "enemy" : "player";
+  const battleContext = { player, enemy, logs, frames };
   pushBattleLogFrame(
     player,
     enemy,
@@ -85,7 +86,13 @@ function resolveDealRandomDamageWhenDamaged(target, player, enemy, logs, frames,
     }
   );
 
-  const note = applyDamage(victim, amount, target);
+  const note = applyDamage(victim, amount, target, battleContext, {
+    attackerId: target.instanceId,
+    defenderId: victim.instanceId,
+    attackerSide: sideContext.side,
+    defenderSide,
+    progress: options.progress,
+  });
   pushBattleFrameOnly(player, enemy, frames, {
     attackerId: target.instanceId,
     defenderId: victim.instanceId,

@@ -395,6 +395,129 @@ function testCleaveAndPoisonous(projectRoot) {
   assert(summary.remainingEnemy.length === 0, "剧毒顺劈应能清空相邻两个目标。");
 }
 
+function testSweepKeyword(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const attacker = createOwnedMinion("taunt-guard");
+    attacker.name = "横扫测试兵";
+    attacker.attack = 1;
+    attacker.health = 6;
+    attacker.keywords = ["sweep"];
+    const left = createOwnedMinion("tabby-cat");
+    const center = createOwnedMinion("retired-veteran");
+    center.attack = 0;
+    center.health = 1;
+    const right = createOwnedMinion("tabby-cat");
+    const player = [attacker];
+    const enemy = [left, center, right];
+    const logs = [];
+    const frames = [];
+    performSingleAttack(player, enemy, logs, frames, "player", attacker, "测试横扫");
+    globalThis.__sweepKeywordSummary = {
+      logs,
+      remainingEnemy: enemy.map((minion) => minion.name),
+    };
+  `);
+  const summary = harness.run("__sweepKeywordSummary");
+  assert(summary.logs.some((line) => line.includes("横扫波及了")), "横扫命中相邻单位时应写入日志。");
+  assert(summary.remainingEnemy.length === 0, "横扫应同时命中主目标两侧的相邻单位。");
+}
+
+function testComboKeyword(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const attacker = createOwnedMinion("arena-champion");
+    attacker.name = "连击测试兵";
+    attacker.attack = 2;
+    attacker.health = 6;
+    attacker.keywords = ["combo"];
+    const enemyA = createOwnedMinion("tabby-cat");
+    const enemyB = createOwnedMinion("tabby-cat");
+    const player = [attacker];
+    const enemy = [enemyA, enemyB];
+    const logs = [];
+    const frames = [];
+    performAttackSequence(player, enemy, logs, frames, "player", attacker.instanceId, "测试连击");
+    globalThis.__comboKeywordSummary = {
+      logs,
+      remainingEnemy: enemy.map((minion) => minion.name),
+    };
+  `);
+  const summary = harness.run("__comboKeywordSummary");
+  assert(summary.logs.some((line) => line.includes("发动连击")), "连击触发时应写入日志。");
+  assert(summary.remainingEnemy.length === 0, "连击应让单位在同一轮中额外完成一次攻击。");
+}
+
+function testBarrierKeyword(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const attacker = createOwnedMinion("arena-champion");
+    attacker.name = "壁垒对手";
+    attacker.attack = 5;
+    attacker.health = 8;
+    const barrier = createOwnedMinion("taunt-guard");
+    barrier.name = "壁垒守卫";
+    barrier.attack = 0;
+    barrier.health = 4;
+    barrier.keywords = ["barrier"];
+    const protectedMinion = createOwnedMinion("retired-veteran");
+    protectedMinion.name = "被守护者";
+    protectedMinion.attack = 0;
+    protectedMinion.health = 4;
+    protectedMinion.keywords = ["provoke"];
+    const player = [attacker];
+    const enemy = [barrier, protectedMinion];
+    const logs = [];
+    const frames = [];
+    performSingleAttack(player, enemy, logs, frames, "player", attacker, "测试壁垒");
+    globalThis.__barrierKeywordSummary = {
+      logs,
+      remainingEnemy: enemy.map((minion) => ({
+        name: minion.name,
+        health: minion.health,
+      })),
+    };
+  `);
+  const summary = harness.run("__barrierKeywordSummary");
+  const barrier = summary.remainingEnemy.find((minion) => minion.name === "壁垒守卫");
+  const protectedMinion = summary.remainingEnemy.find((minion) => minion.name === "被守护者");
+  assert(summary.logs.some((line) => line.includes("以壁垒为 被守护者 分担了 2 点伤害")), "壁垒分担伤害时应写入日志。");
+  assert(barrier && barrier.health === 2, "壁垒单位应代为承受一半伤害，向下取整。");
+  assert(protectedMinion && protectedMinion.health === 1, "被保护目标应只承受剩余伤害。");
+}
+
+function testAssaultKeyword(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const rebornAttacker = createOwnedMinion("crypt-warden");
+    rebornAttacker.name = "狂袭看守者";
+    rebornAttacker.attack = 2;
+    rebornAttacker.health = 1;
+    rebornAttacker.keywords = ["reborn", "assault"];
+    rebornAttacker.reborn = { used: false };
+    const enemyFront = createOwnedMinion("tabby-cat");
+    enemyFront.name = "前排目标";
+    enemyFront.attack = 6;
+    enemyFront.health = 4;
+    enemyFront.keywords = ["provoke"];
+    const enemyBack = createOwnedMinion("tabby-cat");
+    enemyBack.attack = 0;
+    const result = simulateBattle([rebornAttacker], [enemyFront, enemyBack]);
+    globalThis.__assaultKeywordSummary = {
+      logs: result.logs,
+      remainingEnemy: result.remainingEnemy.map((minion) => minion.name),
+    };
+  `);
+  const summary = harness.run("__assaultKeywordSummary");
+  const assaultLogCount = summary.logs.filter((line) => line.includes("触发狂袭")).length;
+  assert(assaultLogCount >= 2, "狂袭单位应在开战登场和复生后分别立即发起攻击。");
+  assert(summary.logs.some((line) => line.includes("触发复生")), "狂袭复生用例应先成功触发复生。");
+  assert(
+    summary.logs.filter((line) => line.includes("攻击了 敌方 前排目标")).length >= 2,
+    "复生后的狂袭应再次立刻攻击同一前排目标。"
+  );
+}
+
 function testCombatStartDealAllDamage(projectRoot) {
   const harness = createHarness(projectRoot);
   harness.run(`
@@ -777,6 +900,10 @@ function main() {
     ["enemy-growth-curve", testEnemyGrowthCurve],
     ["battle-damage-curve", testBattleDamageCurve],
     ["cleave-poisonous", testCleaveAndPoisonous],
+    ["keyword-sweep", testSweepKeyword],
+    ["keyword-combo", testComboKeyword],
+    ["keyword-barrier", testBarrierKeyword],
+    ["keyword-assault", testAssaultKeyword],
     ["combat-start-deal-all", testCombatStartDealAllDamage],
     ["beast-combat-start-buff", testBeastCombatStartBuff],
     ["mech-grant-divine-shield", testMechGrantDivineShield],

@@ -6,5 +6,8 @@
     "browser:regression": "node ./scripts/browser-regression.js",
     "visual:layout": "node ./scripts/visual-layout-regression.js",
     "regression": "npm run smoke && npm run browser:regression"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.60.0"
   }
 }

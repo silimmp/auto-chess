@@ -124,6 +124,7 @@ function resolveRepeatedRandomDamageCombatStart(context, shots) {
   const { source, side, targets, player, enemy, logs, frames, progress } = context;
   const amount = source.combatStart.amount ?? 0;
   const defenderSide = side === "player" ? "enemy" : "player";
+  const battleContext = { player, enemy, logs, frames };
   let triggered = false;
 
   for (let shot = 0; shot < shots; shot += 1) {
@@ -145,7 +146,13 @@ function resolveRepeatedRandomDamageCombatStart(context, shots) {
       progress,
       delay: BATTLE_ACTION_DELAY_MS,
     });
-    const note = applyDamage(target, amount);
+    const note = applyDamage(target, amount, null, battleContext, {
+      attackerId: source.instanceId,
+      defenderId: target.instanceId,
+      attackerSide: side,
+      defenderSide,
+      progress,
+    });
     pushBattleFrameOnly(player, enemy, frames, {
       attackerId: source.instanceId,
       defenderId: target.instanceId,
@@ -238,6 +245,7 @@ function resolveDealAllDamageCombatStart(context) {
 
   const amount = source.combatStart.amount ?? 0;
   const defenderSide = side === "player" ? "enemy" : "player";
+  const battleContext = { player, enemy, logs, frames };
   pushBattleLogFrame(player, enemy, logs, frames, `${source.name} 在战斗开始时对所有敌方随从造成了 ${amount} 点伤害。`, {
     attackerId: source.instanceId,
     attackerSide: side,
@@ -249,7 +257,13 @@ function resolveDealAllDamageCombatStart(context) {
   });
 
   livingTargets.forEach((target) => {
-    const note = applyDamage(target, amount, source);
+    const note = applyDamage(target, amount, source, battleContext, {
+      attackerId: source.instanceId,
+      defenderId: target.instanceId,
+      attackerSide: side,
+      defenderSide,
+      progress,
+    });
     recordPostDamageEffects(note, target, player, enemy, logs, frames, {
       attackerId: source.instanceId,
       defenderId: target.instanceId,

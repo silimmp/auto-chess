@@ -29,7 +29,11 @@ function buildMinionCard(minion, options = {}) {
               ? "keyword shield"
               : keyword === "cleave"
                 ? "keyword taunt"
-            : "keyword";
+                : keyword === "sweep" || keyword === "combo" || keyword === "assault"
+                  ? "keyword taunt"
+                  : keyword === "barrier"
+                    ? "keyword shield"
+                    : "keyword";
       return `<span class="${className}">${label}</span>`;
     })
     .join("");
@@ -110,6 +114,18 @@ function getKeywordLabel(keyword) {
   }
   if (keyword === "cleave") {
     return "顺劈";
+  }
+  if (keyword === "sweep") {
+    return "横扫";
+  }
+  if (keyword === "combo") {
+    return "连击";
+  }
+  if (keyword === "barrier") {
+    return "壁垒";
+  }
+  if (keyword === "assault") {
+    return "狂袭";
   }
   return keyword;
 }
