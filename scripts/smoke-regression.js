@@ -518,6 +518,31 @@ function testAssaultKeyword(projectRoot) {
   );
 }
 
+function testKeywordCardsInPool(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    globalThis.__keywordPoolSummary = {
+      swordsman: createOwnedMinion("wandering-swordsman"),
+      cleaver: createOwnedMinion("cleaver-warrior"),
+      cannon: createOwnedMinion("assault-cannon"),
+      warden: createOwnedMinion("crypt-warden"),
+      bastion: createOwnedMinion("ironclad-bastion"),
+    };
+  `);
+  const summary = harness.run("__keywordPoolSummary");
+  assert(summary.swordsman.keywords.includes("combo"), "流浪剑士应已接入连击关键词。");
+  assert(summary.swordsman.text.includes("连击"), "流浪剑士描述应显式写出连击。");
+  assert(summary.cleaver.keywords.includes("sweep"), "裂斧战士应已接入横扫关键词。");
+  assert(summary.cleaver.text.includes("横扫"), "裂斧战士描述应显式写出横扫。");
+  assert(summary.cannon.keywords.includes("assault"), "进击火炮应已接入狂袭关键词。");
+  assert(summary.cannon.text.includes("狂袭"), "进击火炮描述应显式写出狂袭。");
+  assert(summary.warden.keywords.includes("reborn") && summary.warden.keywords.includes("assault"), "墓窟看守者应同时具备复生与狂袭。");
+  assert(summary.warden.text.includes("复生、狂袭"), "墓窟看守者描述应同步体现复生与狂袭。");
+  assert(summary.bastion.keywords.includes("barrier"), "铁甲壁垒应已接入壁垒关键词。");
+  assert(summary.bastion.text.includes("壁垒"), "铁甲壁垒描述应显式写出壁垒。");
+  assert(summary.bastion.combatStart && summary.bastion.combatStart.includeSource === false, "铁甲壁垒的圣盾光环不应再作用于自身。");
+}
+
 function testCombatStartDealAllDamage(projectRoot) {
   const harness = createHarness(projectRoot);
   harness.run(`
@@ -904,6 +929,7 @@ function main() {
     ["keyword-combo", testComboKeyword],
     ["keyword-barrier", testBarrierKeyword],
     ["keyword-assault", testAssaultKeyword],
+    ["keyword-cards-in-pool", testKeywordCardsInPool],
     ["combat-start-deal-all", testCombatStartDealAllDamage],
     ["beast-combat-start-buff", testBeastCombatStartBuff],
     ["mech-grant-divine-shield", testMechGrantDivineShield],
