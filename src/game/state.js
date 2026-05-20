@@ -31,9 +31,9 @@ function createElements() {
 
 function createPrepZones(elements) {
   return {
-    shop: elements.shop?.closest(".prep-zone") || null,
-    hand: elements.hand?.closest(".prep-zone") || null,
-    board: elements.board?.closest(".prep-zone") || null,
+    shop: elements.shop?.closest(".prep-shop-zone") || null,
+    hand: elements.hand?.closest(".prep-hand-zone") || null,
+    board: elements.board?.closest(".prep-board-zone") || null,
   };
 }
 

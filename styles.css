@@ -372,11 +372,11 @@ body::after {
   min-height: 0;
   position: relative;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  align-content: start;
-  gap: 14px;
-  padding-top: 14px;
-  padding-bottom: 14px;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  gap: 10px;
+  padding-top: 12px;
+  padding-bottom: 8px;
   background:
     radial-gradient(circle at top, rgba(255, 216, 132, 0.16), transparent 36%),
     linear-gradient(180deg, rgba(255, 248, 232, 0.78), rgba(227, 209, 180, 0.96));
@@ -437,21 +437,62 @@ body::after {
     linear-gradient(180deg, rgba(117, 67, 42, 0.2), rgba(255, 244, 220, 0.4));
 }
 
-.prep-board-zone {
-  grid-template-rows: minmax(0, 1fr);
+.prep-battle-stack {
+  position: relative;
+  display: grid;
+  gap: 0;
+  min-height: 0;
+  padding: 10px 10px 0;
+  border-radius: 30px;
+  border: 0;
   background:
-    radial-gradient(circle at center, rgba(90, 149, 126, 0.16), transparent 46%),
-    linear-gradient(180deg, rgba(63, 92, 78, 0.22), rgba(255, 247, 229, 0.4));
+    radial-gradient(circle at 50% 42%, rgba(255, 233, 180, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(124, 93, 70, 0.12), rgba(255, 245, 224, 0.32));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 241, 0.18),
+    0 12px 24px rgba(64, 40, 24, 0.06);
+  overflow: visible;
+  grid-template-rows: minmax(186px, 1fr) 174px;
+}
+
+.prep-battle-stack::before {
+  content: none;
+}
+
+.prep-board-zone {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
 }
 
 .prep-hand-zone {
+  position: relative;
+  z-index: 3;
+  display: grid;
   grid-template-rows: minmax(0, 1fr);
-  background:
-    radial-gradient(circle at bottom right, rgba(96, 109, 170, 0.14), transparent 34%),
-    linear-gradient(180deg, rgba(74, 62, 97, 0.14), rgba(255, 248, 231, 0.36));
-  min-height: 188px;
+  min-height: 0;
   align-items: end;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.prep-battle-stack .prep-board-zone,
+.prep-battle-stack .prep-hand-zone {
+  padding-inline: 12px;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.prep-battle-stack .prep-board-zone {
+  padding-top: 8px;
+  padding-bottom: 14px;
+}
+
+.prep-battle-stack .prep-hand-zone {
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 18px;
 }
 
 .shop-toolbar,
@@ -675,8 +716,8 @@ body::after {
 
 .hand-row {
   position: relative;
-  min-height: 172px;
-  padding: 34px 14px 0;
+  min-height: 108px;
+  padding: 0 10px 0;
   align-items: end;
   justify-content: center;
   flex-wrap: nowrap;
@@ -689,18 +730,19 @@ body::after {
 .hand-tray-hotspot {
   position: absolute;
   left: 50%;
-  bottom: -30px;
-  width: min(520px, calc(100% - 36px));
-  height: 132px;
+  bottom: -22px;
+  width: min(620px, calc(100% - 20px));
+  height: 106px;
   transform: translateX(-50%);
   border-radius: 50% 50% 0 0;
   background:
-    radial-gradient(circle at 50% 10%, rgba(255, 247, 214, 0.52), transparent 48%),
-    linear-gradient(180deg, rgba(126, 85, 55, 0.14), rgba(255, 255, 255, 0));
+    radial-gradient(circle at 50% 10%, rgba(255, 247, 214, 0.24), transparent 44%),
+    linear-gradient(180deg, rgba(126, 85, 55, 0.05), rgba(255, 255, 255, 0));
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 235, 0.36),
-    0 -8px 20px rgba(56, 34, 28, 0.08);
+    inset 0 1px 0 rgba(255, 251, 235, 0.16),
+    0 -4px 12px rgba(56, 34, 28, 0.03);
   pointer-events: none;
+  opacity: 0.38;
   transition: opacity 0.24s ease, transform 0.24s ease, filter 0.24s ease;
 }
 
@@ -708,12 +750,12 @@ body::after {
   content: "手牌区";
   position: absolute;
   left: 50%;
-  bottom: 14px;
+  bottom: 12px;
   transform: translateX(-50%);
   font-size: 11px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: rgba(84, 61, 55, 0.45);
+  color: rgba(84, 61, 55, 0.26);
   pointer-events: none;
   transition: transform 0.24s ease, opacity 0.24s ease, color 0.24s ease;
 }
@@ -722,14 +764,14 @@ body::after {
 .prep-hand-zone.drop-target .hand-row,
 .prep-hand-zone:focus-within .hand-row,
 .hand-row:focus-within {
-  transform: translateY(-10px);
+  transform: translateY(-14px);
 }
 
 .prep-hand-zone:hover .hand-tray-hotspot,
 .prep-hand-zone:focus-within .hand-tray-hotspot,
 .prep-hand-zone.drop-target .hand-tray-hotspot {
   opacity: 1;
-  transform: translateX(-50%) translateY(-6px);
+  transform: translateX(-50%) translateY(-8px);
   filter: saturate(1.06);
 }
 
@@ -776,10 +818,11 @@ body::after {
   align-items: center;
   justify-content: center;
   min-height: 120px;
-  margin-top: 22px;
+  margin-top: 6px;
   border-radius: 999px;
-  border: 1px dashed rgba(116, 69, 28, 0.22);
-  background: rgba(255, 246, 224, 0.28);
+  border: 0;
+  background: transparent;
+  color: rgba(45, 27, 18, 0.48);
 }
 
 .minion-card,
@@ -813,7 +856,7 @@ body::after {
     radial-gradient(circle at top, rgba(255, 255, 255, 0.54), transparent 36%),
     linear-gradient(180deg, rgba(255, 250, 240, 0.88), rgba(238, 220, 188, 0.98)),
     linear-gradient(135deg, rgba(221, 168, 79, 0.22), rgba(0, 0, 0, 0));
-  border: 1px solid rgba(107, 61, 30, 0.22);
+  border: 1px solid rgba(255, 247, 229, 0.72);
   border-top-left-radius: 18px 14px;
   border-top-right-radius: 18px 14px;
   border-bottom-left-radius: 18px 24px;
@@ -844,18 +887,19 @@ body::after {
 .hand-row .minion-card {
   --fan-offset: 0px;
   --fan-rotate: 0deg;
-  --fan-lift: 58px;
+  --fan-lift: 22px;
   flex: 0 0 auto;
+  min-height: 146px;
   margin-left: -52px;
-  transform-origin: center 130%;
-  transform: translateX(var(--fan-offset)) translateY(var(--fan-lift)) rotate(var(--fan-rotate)) scale(0.92);
+  transform-origin: center bottom;
+  transform: translateX(var(--fan-offset)) translateY(var(--fan-lift)) rotate(var(--fan-rotate)) scale(0.8);
   transition:
     transform 0.26s cubic-bezier(0.2, 0.75, 0.2, 1),
     margin 0.24s ease,
     box-shadow 0.22s ease,
     filter 0.22s ease,
     opacity 0.22s ease;
-  z-index: 1;
+  z-index: 4;
 }
 
 .hand-row .minion-card:first-child {
@@ -867,14 +911,14 @@ body::after {
 .prep-hand-zone:focus-within .hand-row .minion-card,
 .hand-row:focus-within .minion-card {
   margin-left: -14px;
-  transform: translateX(0) translateY(0) rotate(0deg) scale(1);
+  transform: translateX(0) translateY(-8px) rotate(0deg) scale(0.96);
 }
 
 .hand-row .minion-card:hover,
 .hand-row .minion-card:focus-within,
 .hand-row .minion-card.drag-source {
-  z-index: 30;
-  transform: translateX(0) translateY(-8px) rotate(0deg) scale(1.04);
+  z-index: 32;
+  transform: translateX(0) translateY(-12px) rotate(0deg) scale(0.99);
 }
 
 .hand-row[data-hand-count="1"] .minion-card {
@@ -1057,7 +1101,7 @@ body::after {
   position: absolute;
   inset: 5px;
   z-index: 0;
-  border: 1px solid rgba(128, 78, 35, 0.14);
+  border: 0;
   border-radius: 14px 14px 16px 16px / 12px 12px 18px 18px;
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.26), transparent 38%),
@@ -1709,6 +1753,62 @@ body::after {
 
   .battle-overlay {
     left: 0;
+  }
+}
+
+@media (max-height: 760px) {
+  body {
+    overflow: auto;
+  }
+
+  .game-shell {
+    height: auto;
+    min-height: calc(100vh - 24px);
+    overflow: visible;
+  }
+
+  .prep-panel {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: 6px;
+  }
+
+  .prep-shop-zone {
+    min-height: 148px;
+  }
+
+  .prep-battle-stack {
+    grid-template-rows: minmax(144px, 1fr) 140px;
+    padding: 8px 8px 0;
+  }
+
+  .prep-battle-stack .prep-board-zone {
+    padding-top: 6px;
+    padding-bottom: 10px;
+  }
+
+  .prep-battle-stack .prep-hand-zone {
+    padding-bottom: 16px;
+  }
+
+  .hand-row {
+    min-height: 92px;
+  }
+
+  .hand-row .minion-card {
+    --fan-lift: 12px;
+    min-height: 140px;
+  }
+
+  .hand-tray-hotspot {
+    bottom: -12px;
+    width: min(560px, calc(100% - 16px));
+    height: 88px;
+  }
+
+  .prep-hand-zone::after {
+    bottom: 8px;
   }
 }
 

@@ -161,6 +161,28 @@ async function openPage(browser, url) {
   return { page, consoleErrors, pageErrors };
 }
 
+async function openPageWithViewport(browser, url, viewport) {
+  const page = await browser.newPage({ viewport });
+  const consoleErrors = [];
+  const pageErrors = [];
+
+  page.on("console", (message) => {
+    if (message.type() !== "error" && message.type() !== "warning") {
+      return;
+    }
+    const text = message.text();
+    if (!text.includes("favicon.ico") && !text.includes("Failed to load resource: the server responded with a status of 404")) {
+      consoleErrors.push(`${message.type()}: ${text}`);
+    }
+  });
+  page.on("pageerror", (error) => {
+    pageErrors.push(String(error && error.stack ? error.stack : error));
+  });
+
+  await page.goto(url, { waitUntil: "load" });
+  return { page, consoleErrors, pageErrors };
+}
+
 async function dragCenter(page, sourceSelector, targetSelector, targetOffset = { x: 0, y: 0 }) {
   const source = await page.locator(sourceSelector).boundingBox();
   const target = await page.locator(targetSelector).boundingBox();
@@ -178,12 +200,12 @@ async function dragCenter(page, sourceSelector, targetSelector, targetOffset = {
   await page.mouse.up();
 }
 
-async function dragByOffset(page, sourceSelector, offset) {
+async function dragByOffset(page, sourceSelector, offset, handle = { xRatio: 0.5, yRatio: 0.5 }) {
   const source = await page.locator(sourceSelector).boundingBox();
   assert(source, `缺少拖拽来源：${sourceSelector}`);
 
-  const startX = source.x + source.width / 2;
-  const startY = source.y + source.height / 2;
+  const startX = source.x + source.width * handle.xRatio;
+  const startY = source.y + source.height * handle.yRatio;
   const endX = startX + offset.x;
   const endY = startY + offset.y;
 
@@ -262,6 +284,18 @@ async function runScenario(name, browser, url, handler) {
   }
 }
 
+async function runScenarioWithViewport(name, browser, url, viewport, handler) {
+  const { page, consoleErrors, pageErrors } = await openPageWithViewport(browser, url, viewport);
+  try {
+    const details = await handler(page);
+    assert(consoleErrors.length === 0, `${name} 出现控制台报错：${consoleErrors.join(" | ")}`);
+    assert(pageErrors.length === 0, `${name} 出现页面异常：${pageErrors.join(" | ")}`);
+    return { details, name, status: "PASS" };
+  } finally {
+    await page.close();
+  }
+}
+
 async function main() {
   const port = Number(process.env.BROWSER_REGRESSION_PORT || 8145);
   const projectRoot = path.resolve(__dirname, "..");
@@ -310,30 +344,123 @@ async function main() {
     results.push(
       await runScenario("drag-buy-play", browser, url, async (page) => {
         await dragCenter(page, "#shop-board .minion-card:nth-child(1)", "#hand-board");
+        await page.waitForTimeout(180);
         const afterBuy = await collectPrepCounts(page);
+        const collapsedHandVisible = await page.evaluate(() => {
+          const card = document.querySelector("#hand-board .minion-card");
+          const tray = document.querySelector(".prep-hand-zone");
+          const battleStack = document.querySelector(".prep-battle-stack");
+          const panel = document.querySelector(".prep-panel");
+          if (!card || !tray) {
+            return null;
+          }
+          const cardRect = card.getBoundingClientRect();
+          const trayRect = tray.getBoundingClientRect();
+          const stackRect = battleStack?.getBoundingClientRect();
+          const panelRect = panel?.getBoundingClientRect();
+          return {
+            cardTop: Math.round(cardRect.top),
+            cardVisibleHeight: Math.round(Math.max(0, trayRect.bottom - cardRect.top)),
+            overPanelBottom: panelRect ? Math.round(cardRect.bottom - panelRect.bottom) : null,
+            overStackBottom: stackRect ? Math.round(cardRect.bottom - stackRect.bottom) : null,
+            trayBottom: Math.round(trayRect.bottom),
+          };
+        });
         assert(afterBuy.gold === "0", "第 1 回合买牌后金币应归零。");
         assert(afterBuy.hand === 1, "拖拽购买后应进入手牌。");
+        assert(collapsedHandVisible && collapsedHandVisible.cardVisibleHeight >= 54, "默认收纳状态下手牌露出高度不足。");
+        assert(collapsedHandVisible.overStackBottom !== null && collapsedHandVisible.overStackBottom <= 0, "默认收纳状态下手牌超出了共享战备区。");
+        assert(collapsedHandVisible.overPanelBottom !== null && collapsedHandVisible.overPanelBottom <= 0, "默认收纳状态下手牌超出了准备阶段主框。");
 
-        await dragCenter(page, "#hand-board .minion-card:nth-child(1)", "#player-board");
+        await dragByOffset(page, "#hand-board .minion-card:nth-child(1)", { x: 0, y: -180 }, { xRatio: 0.5, yRatio: 0.22 });
         const afterPlay = await collectPrepCounts(page);
         assert(afterPlay.hand === 0, "上阵后手牌应为空。");
         assert(afterPlay.board === 1, "上阵后战场应有 1 个单位。");
-        return { afterBuy, afterPlay };
+        return { afterBuy, afterPlay, collapsedHandVisible };
       })
     );
 
     results.push(
       await runScenario("hand-fan-deploy", browser, url, async (page) => {
         await dragCenter(page, "#shop-board .minion-card:nth-child(1)", "#hand-board");
+        await page.waitForTimeout(180);
         await moveMouseToSelector(page, ".prep-hand-zone", { x: 0, y: 54 });
-        const expanded = await page.locator(".prep-hand-zone").evaluate((element) => element.matches(":hover"));
-        assert(expanded, "鼠标扫到手牌热区后应命中手牌区。");
+        const expandedState = await page.evaluate(() => {
+          const zone = document.querySelector(".prep-hand-zone");
+          const handCard = document.querySelector("#hand-board .minion-card");
+          const boardZone = document.querySelector(".prep-board-zone");
+          if (!zone || !handCard || !boardZone) {
+            return null;
+          }
 
-        await dragByOffset(page, "#hand-board .minion-card:nth-child(1)", { x: 0, y: -170 });
+          const handRect = handCard.getBoundingClientRect();
+          const boardRect = boardZone.getBoundingClientRect();
+          const probeX = handRect.left + handRect.width / 2;
+          const probeY = handRect.top + Math.min(32, handRect.height / 2);
+          const topElement = document.elementFromPoint(probeX, probeY);
+          return {
+            boardBottom: Math.round(boardRect.bottom),
+            boardTop: Math.round(boardRect.top),
+            cardTop: Math.round(handRect.top),
+            expanded: zone.matches(":hover"),
+            topElementZone: topElement?.closest(".prep-hand-zone") ? "hand" : topElement?.closest(".prep-board-zone") ? "board" : "",
+          };
+        });
+        assert(expandedState, "展开手牌时缺少关键区域。");
+        assert(expandedState.expanded, "鼠标扫到手牌热区后应命中手牌区。");
+        assert(expandedState.cardTop < expandedState.boardBottom, "展开后手牌应进入共享战备区的战场层范围。");
+        assert(expandedState.topElementZone === "hand", "展开手牌上方命中被战场层遮挡。");
+
+        await dragByOffset(page, "#hand-board .minion-card:nth-child(1)", { x: 0, y: -170 }, { xRatio: 0.5, yRatio: 0.22 });
         const afterDeploy = await collectPrepCounts(page);
         assert(afterDeploy.hand === 0, "拖出手牌托盘后应成功打出。");
         assert(afterDeploy.board === 1, "拖出手牌托盘后应进入战场。");
-        return { afterDeploy, expanded };
+        return { afterDeploy, expandedState };
+      })
+    );
+
+    results.push(
+      await runScenarioWithViewport("short-viewport-hand-visible", browser, url, { width: 1513, height: 472 }, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.gold = 0;
+          api.state.shop = [];
+          api.state.board = [];
+          api.state.hand = [api.createOwnedMinion("wandering-swordsman")];
+          api.state.enemyBoard = [];
+          api.render();
+        });
+        await page.waitForTimeout(180);
+
+        const metrics = await page.evaluate(() => {
+          const card = document.querySelector("#hand-board .minion-card");
+          const tray = document.querySelector(".prep-hand-zone");
+          const panel = document.querySelector(".prep-panel");
+          if (!card || !tray || !panel) {
+            return null;
+          }
+          const cardRect = card.getBoundingClientRect();
+          const trayRect = tray.getBoundingClientRect();
+          const panelRect = panel.getBoundingClientRect();
+          return {
+            cardVisibleHeight: Math.round(Math.max(0, trayRect.bottom - cardRect.top)),
+            overPanelBottom: Math.round(cardRect.bottom - panelRect.bottom),
+            overTrayBottom: Math.round(cardRect.bottom - trayRect.bottom),
+            trayVisibleHeight: Math.round(
+              Math.max(0, Math.min(trayRect.bottom, panelRect.bottom) - Math.max(trayRect.top, panelRect.top))
+            ),
+          };
+        });
+
+        assert(metrics, "矮视口下缺少手牌区或卡牌。");
+        assert(metrics.cardVisibleHeight >= 60, "矮视口下手牌默认露出高度不足。");
+        assert(metrics.overTrayBottom <= 0, "矮视口下手牌超出了共享战备区。");
+        assert(metrics.overPanelBottom <= 0, "矮视口下手牌超出了准备阶段主框。");
+        assert(metrics.trayVisibleHeight >= 100, "矮视口下手牌托盘落出了主框可视区。");
+        return metrics;
       })
     );
 
