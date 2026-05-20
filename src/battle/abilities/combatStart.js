@@ -31,10 +31,14 @@ function applyCombatStartAbility(source, side, targets, player, enemy, logs, fra
 
 function resolveCombatStartAbility(context) {
   const handlers = {
+    "buff-adjacent": resolveBuffAdjacentCombatStart,
+    "buff-random-friendly": resolveBuffRandomFriendlyCombatStart,
     "buff-friendly-tribe": resolveBuffFriendlyTribeCombatStart,
     "deal-random-damage": resolveDealRandomDamageCombatStart,
     "deal-random-damage-repeat": resolveDealRandomDamageRepeatCombatStart,
     "deal-all-damage": resolveDealAllDamageCombatStart,
+    "gain-self-per-friendly": resolveGainSelfPerFriendlyCombatStart,
+    "grant-keyword-adjacent": resolveGrantKeywordAdjacentCombatStart,
     "grant-keyword-friendly-tribe": resolveGrantKeywordFriendlyTribeCombatStart,
   };
   const handler = handlers[context.source.combatStart.type];
@@ -42,6 +46,70 @@ function resolveCombatStartAbility(context) {
     return false;
   }
   return handler(context);
+}
+
+function resolveBuffAdjacentCombatStart(context) {
+  const { source, side, player, enemy, logs, frames, progress } = context;
+  const adjacent = getAdjacentFriendlyCombatStartTargets(context);
+  if (!adjacent.length) {
+    return false;
+  }
+
+  const attack = source.combatStart.attack ?? 0;
+  const health = source.combatStart.health ?? 0;
+  adjacent.forEach((minion) => {
+    minion.attack += attack;
+    minion.health += health;
+  });
+
+  pushBattleLogFrame(
+    player,
+    enemy,
+    logs,
+    frames,
+    `${source.name} 在战斗开始时整顿阵形，使相邻友军获得了 +${attack}/+${health}。`,
+    {
+      attackerId: source.instanceId,
+      attackerSide: side,
+      hitIds: adjacent.map((minion) => minion.instanceId),
+      progress,
+      delay: BATTLE_ACTION_DELAY_MS,
+    }
+  );
+  return true;
+}
+
+function resolveBuffRandomFriendlyCombatStart(context) {
+  const { source, side, player, enemy, logs, frames, progress } = context;
+  const candidates = getMatchingFriendlyCombatStartTargets(context);
+  if (!candidates.length) {
+    return false;
+  }
+
+  const count = Math.min(source.combatStart.count ?? 1, candidates.length);
+  const chosen = pickUniqueMinions(candidates, count);
+  const attack = source.combatStart.attack ?? 0;
+  const health = source.combatStart.health ?? 0;
+  chosen.forEach((minion) => {
+    minion.attack += attack;
+    minion.health += health;
+  });
+
+  pushBattleLogFrame(
+    player,
+    enemy,
+    logs,
+    frames,
+    `${source.name} 在战斗开始时挑选了 ${chosen.length} 个友军，赋予 +${attack}/+${health}。`,
+    {
+      attackerId: source.instanceId,
+      attackerSide: side,
+      hitIds: chosen.map((minion) => minion.instanceId),
+      progress,
+      delay: BATTLE_ACTION_DELAY_MS,
+    }
+  );
+  return true;
 }
 
 function resolveDealRandomDamageCombatStart(context) {
@@ -131,6 +199,36 @@ function resolveBuffFriendlyTribeCombatStart(context) {
   return true;
 }
 
+function resolveGainSelfPerFriendlyCombatStart(context) {
+  const { source, side, player, enemy, logs, frames, progress } = context;
+  const friendlies = getMatchingFriendlyCombatStartTargets(context);
+  const count = friendlies.length;
+  if (count <= 0) {
+    return false;
+  }
+
+  const attack = (source.combatStart.attack ?? 0) * count;
+  const health = (source.combatStart.health ?? 0) * count;
+  source.attack += attack;
+  source.health += health;
+
+  pushBattleLogFrame(
+    player,
+    enemy,
+    logs,
+    frames,
+    `${source.name} 在战斗开始时从 ${count} 个友军身上获得战意，得到 +${attack}/+${health}。`,
+    {
+      attackerId: source.instanceId,
+      attackerSide: side,
+      hitIds: [source.instanceId],
+      progress,
+      delay: BATTLE_ACTION_DELAY_MS,
+    }
+  );
+  return true;
+}
+
 function resolveDealAllDamageCombatStart(context) {
   const { source, side, targets, player, enemy, logs, frames, progress } = context;
   const livingTargets = targets.filter((minion) => minion.health > 0);
@@ -204,10 +302,41 @@ function resolveGrantKeywordFriendlyTribeCombatStart(context) {
   return true;
 }
 
+function resolveGrantKeywordAdjacentCombatStart(context) {
+  const { source, side, player, enemy, logs, frames, progress } = context;
+  const keyword = source.combatStart.keyword;
+  const adjacent = getAdjacentFriendlyCombatStartTargets(context).filter(
+    (minion) => !minion.keywords.includes(keyword)
+  );
+  if (!adjacent.length) {
+    return false;
+  }
+
+  adjacent.forEach((minion) => {
+    minion.keywords.push(keyword);
+  });
+
+  pushBattleLogFrame(
+    player,
+    enemy,
+    logs,
+    frames,
+    `${source.name} 在战斗开始时为相邻友军施加了${getKeywordLabel(keyword)}。`,
+    {
+      attackerId: source.instanceId,
+      attackerSide: side,
+      hitIds: adjacent.map((minion) => minion.instanceId),
+      progress,
+      delay: BATTLE_ACTION_DELAY_MS,
+    }
+  );
+  return true;
+}
+
 function getMatchingFriendlyCombatStartTargets(context) {
   const { source, side, player, enemy } = context;
   const includeSource = Boolean(source.combatStart.includeSource);
-  const board = side === "player" ? player : enemy;
+  const board = getCombatStartSourceBoard(context);
   return board.filter((minion) => {
     if (minion.health <= 0) {
       return false;
@@ -220,4 +349,37 @@ function getMatchingFriendlyCombatStartTargets(context) {
     }
     return true;
   });
+}
+
+function getAdjacentFriendlyCombatStartTargets(context) {
+  const board = getCombatStartSourceBoard(context);
+  const index = board.findIndex((minion) => minion.instanceId === context.source.instanceId);
+  if (index === -1) {
+    return [];
+  }
+
+  return [board[index - 1], board[index + 1]].filter((minion) => {
+    if (!minion || minion.health <= 0) {
+      return false;
+    }
+    if (context.source.combatStart.tribe && minion.tribe !== context.source.combatStart.tribe) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function getCombatStartSourceBoard(context) {
+  return context.side === "player" ? context.player : context.enemy;
+}
+
+function pickUniqueMinions(candidates, count) {
+  const pool = [...candidates];
+  const chosen = [];
+  while (pool.length && chosen.length < count) {
+    const minion = pickRandom(pool);
+    chosen.push(minion);
+    pool.splice(pool.indexOf(minion), 1);
+  }
+  return chosen;
 }

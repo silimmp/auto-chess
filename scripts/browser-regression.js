@@ -552,6 +552,51 @@ async function main() {
     );
 
     results.push(
+      await runScenario("turn-end-before-battle", browser, url, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.stopPostBattleReturn();
+          api.stopBattlePlayback();
+          api.state.phase = "prep";
+          api.state.timeLeft = 15;
+          api.state.hp = 30;
+          api.state.gold = 3;
+          api.state.turn = 2;
+          api.state.shop = [];
+          api.state.hand = [];
+          api.state.board = [api.createOwnedMinion("arena-veteran"), api.createOwnedMinion("tavern-attendant")];
+          api.state.enemyBoard = [api.createOwnedMinion("taunt-guard")];
+          const enemy = getLobbyPlayerById(api.state.lobby, api.state.currentOpponentId);
+          if (enemy) {
+            enemy.board = api.state.enemyBoard.map(api.copyMinion);
+          }
+          api.render();
+        });
+        await syncEnemyBoard(page);
+
+        await page.click("#battle-btn");
+        await waitForBattleAnimation(page);
+        const duringBattle = await page.evaluate(() => ({
+          startingPlayer: window.__AUTO_CHESS_TEST_API__.state.battleAnimation.playerBoard.map((minion) => ({
+            name: minion.name,
+            attack: minion.attack,
+            health: minion.health,
+          })),
+        }));
+
+        const veteran = duringBattle.startingPlayer.find((minion) => minion.name === "竞技老兵");
+        const attendant = duringBattle.startingPlayer.find((minion) => minion.name === "酒馆侍从");
+        assert(
+          (veteran && (veteran.attack > 3 || veteran.health > 3)) ||
+            (attendant && (attendant.attack > 1 || attendant.health > 3)),
+          "回合结束效果应先结算，再进入战斗演出。"
+        );
+        return duringBattle;
+      })
+    );
+
+    results.push(
       await runScenario("lobby-hp-settlement", browser, url, async (page) => {
         await page.evaluate(() => {
           const api = window.__AUTO_CHESS_TEST_API__;

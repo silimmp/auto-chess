@@ -230,6 +230,10 @@ function startGameApp() {
     stopBattlePlayback();
     state.timeLeft = 0;
     state.pendingLobbySnapshot = createLobbySnapshot(state.lobby);
+    resolveLobbyPhaseEffects(state, "turnEnd", null, pickRandom, randomInt);
+    const currentOpponent =
+      state.currentOpponentId === "ghost" ? null : getLobbyPlayerById(state.lobby, state.currentOpponentId);
+    state.enemyBoard = currentOpponent ? currentOpponent.board.map(copyMinion) : state.lobby.ghostBoard.map(copyMinion);
 
     const intro = trigger === "timer" ? "准备时间结束，自动进入战斗。" : "你提前结束了准备阶段。";
     const lobbyRound = resolveLobbyRound(

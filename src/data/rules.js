@@ -36,7 +36,7 @@ const TURN_GOLD_BY_TURN = {
   7: 10,
 };
 
-const MINION_ABILITY_FIELDS = ["deathrattle", "combatStart", "reborn", "damageTrigger"];
+const MINION_ABILITY_FIELDS = ["deathrattle", "combatStart", "turnStart", "turnEnd", "reborn", "damageTrigger"];
 const SHOP_SLOTS = 5;
 const CONTENT_TIER_CAP = MAX_TAVERN_TIER;
 

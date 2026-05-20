@@ -11,11 +11,16 @@ function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard,
     if (!currentOpponent.isHuman && currentOpponent.alive && currentOpponent.board.length === 0) {
       currentOpponent.board = generateEnemyBoard(state.turn, pickRandom, randomInt);
     }
+  } else {
+    state.currentOpponentName = LOBBY_GHOST_LABEL;
+  }
+
+  resolveLobbyPhaseEffects(state, "turnStart", generateEnemyBoard, pickRandom, randomInt);
+  if (currentOpponent) {
     state.enemyBoard = currentOpponent.board.map(copyMinion);
     state.currentOpponentName = currentOpponent.name;
   } else {
     state.enemyBoard = state.lobby.ghostBoard.map(copyMinion);
-    state.currentOpponentName = LOBBY_GHOST_LABEL;
   }
 }
 

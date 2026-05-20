@@ -69,6 +69,8 @@ function createInitialState(generateShop, generateEnemyBoard, pickRandom, random
   };
 
   initial.shop = generateShop(initial.tavernTier, pickRandom);
+  resolveLobbyPhaseEffects(initial, "turnStart", generateEnemyBoard, pickRandom, randomInt);
+  initial.enemyBoard = currentOpponent ? currentOpponent.board.map(copyMinion) : [];
   return initial;
 }
 

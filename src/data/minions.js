@@ -29,7 +29,8 @@ const MINION_POOL = [
     attack: 2,
     health: 1,
     keywords: [],
-    text: "朴素的前期战力。",
+    turnStart: { type: "buff-adjacent", tribe: "恶魔", attack: 1, health: 0 },
+    text: "回合开始时：使相邻的恶魔获得 +1 攻击力。",
   },
   {
     id: "shield-bot",
@@ -38,8 +39,9 @@ const MINION_POOL = [
     tribe: "机械",
     attack: 1,
     health: 2,
-    keywords: ["divineShield"],
-    text: "圣盾。",
+    keywords: ["divineShield", "deathrattle"],
+    deathrattle: { type: "buff-friendly-tribe", tribe: "机械", attack: 0, health: 1 },
+    text: "圣盾。亡语：使你的机械获得 +0/+1。",
   },
   {
     id: "taunt-guard",
@@ -48,8 +50,9 @@ const MINION_POOL = [
     tribe: "人类",
     attack: 2,
     health: 3,
-    keywords: ["taunt"],
-    text: "嘲讽。",
+    keywords: ["taunt", "deathrattle"],
+    deathrattle: { type: "buff-friendly-tribe", tribe: "人类", attack: 1, health: 1 },
+    text: "嘲讽。亡语：使你的人类获得 +1/+1。",
   },
   {
     id: "rat-pack",
@@ -103,7 +106,8 @@ const MINION_POOL = [
     attack: 3,
     health: 3,
     keywords: [],
-    text: "纯粹的身材牌。",
+    turnStart: { type: "buff-adjacent", tribe: "野兽", attack: 1, health: 1 },
+    text: "回合开始时：使相邻的野兽获得 +1/+1。",
   },
   {
     id: "shell-tank",
@@ -112,8 +116,9 @@ const MINION_POOL = [
     tribe: "中立",
     attack: 3,
     health: 4,
-    keywords: ["taunt"],
-    text: "高血量嘲讽前排。",
+    keywords: ["taunt", "deathrattle"],
+    deathrattle: { type: "deal-random-damage", amount: 2 },
+    text: "嘲讽。亡语：对 1 个随机敌方随从造成 2 点伤害。",
   },
   {
     id: "retired-veteran",
@@ -123,7 +128,14 @@ const MINION_POOL = [
     attack: 4,
     health: 4,
     keywords: ["provoke"],
-    text: "挑衅。",
+    damageTrigger: {
+      type: "buff-friendly-tribe-when-damaged",
+      tribe: "人类",
+      attack: 1,
+      health: 0,
+      includeSource: false,
+    },
+    text: "挑衅。受伤后：使其他人类获得 +1 攻击力。",
   },
   {
     id: "assault-cannon",
@@ -134,7 +146,7 @@ const MINION_POOL = [
     health: 3,
     keywords: [],
     combatStart: { type: "deal-random-damage", amount: 2 },
-    text: "战斗开始时，对一个敌方随从造成 2 点伤害。",
+    text: "战斗开始时：对 1 个敌方随从造成 2 点伤害。",
   },
   {
     id: "arena-champion",
@@ -145,7 +157,7 @@ const MINION_POOL = [
     health: 4,
     keywords: [],
     damageTrigger: { type: "gain-stats-when-damaged", attack: 2, health: 1, limit: 2, triggerCount: 0 },
-    text: "受伤后，获得 +2/+1。",
+    text: "受伤后：获得 +2/+1。",
   },
   {
     id: "holy-mech",
@@ -155,7 +167,8 @@ const MINION_POOL = [
     attack: 4,
     health: 3,
     keywords: ["divineShield"],
-    text: "更凶的圣盾单位。",
+    combatStart: { type: "grant-keyword-adjacent", keyword: "divineShield" },
+    text: "圣盾。战斗开始时：使相邻友军获得圣盾。",
   },
   {
     id: "dire-guardian",
@@ -165,7 +178,14 @@ const MINION_POOL = [
     attack: 4,
     health: 5,
     keywords: ["taunt"],
-    text: "中期嘲讽墙。",
+    damageTrigger: {
+      type: "buff-friendly-tribe-when-damaged",
+      tribe: "人类",
+      attack: 0,
+      health: 1,
+      includeSource: false,
+    },
+    text: "嘲讽。受伤后：使其他人类获得 +0/+1。",
   },
   {
     id: "woodland-wolf",
@@ -174,8 +194,9 @@ const MINION_POOL = [
     tribe: "野兽",
     attack: 2,
     health: 1,
-    keywords: [],
-    text: "前期的快攻单位。",
+    keywords: ["deathrattle"],
+    deathrattle: { type: "buff-friendly-tribe", tribe: "野兽", attack: 1, health: 0 },
+    text: "亡语：使你的野兽获得 +1 攻击力。",
   },
   {
     id: "fire-imp",
@@ -185,7 +206,8 @@ const MINION_POOL = [
     attack: 3,
     health: 1,
     keywords: [],
-    text: "高攻低血的冒险选择。",
+    turnEnd: { type: "gain-self-per-friendly", tribe: "恶魔", attack: 1, health: 0 },
+    text: "回合结束时：每有 1 个其他恶魔，便获得 +1 攻击力。",
   },
   {
     id: "cog-squire",
@@ -195,7 +217,8 @@ const MINION_POOL = [
     attack: 2,
     health: 2,
     keywords: [],
-    text: "稳定的机械前排。",
+    turnStart: { type: "buff-adjacent", tribe: "机械", attack: 1, health: 0 },
+    text: "回合开始时：使相邻的机械获得 +1 攻击力。",
   },
   {
     id: "border-militia",
@@ -205,7 +228,8 @@ const MINION_POOL = [
     attack: 2,
     health: 2,
     keywords: [],
-    text: "均衡的人类士兵。",
+    turnStart: { type: "buff-adjacent", tribe: "人类", attack: 1, health: 1 },
+    text: "回合开始时：使相邻的人类获得 +1/+1。",
   },
   {
     id: "crypt-servant",
@@ -225,8 +249,9 @@ const MINION_POOL = [
     tribe: "亡灵",
     attack: 2,
     health: 1,
-    keywords: [],
-    text: "低费亡灵打手。",
+    keywords: ["deathrattle"],
+    deathrattle: { type: "deal-random-damage", amount: 1 },
+    text: "亡语：对 1 个随机敌方随从造成 1 点伤害。",
   },
   {
     id: "wandering-swordsman",
@@ -236,7 +261,8 @@ const MINION_POOL = [
     attack: 2,
     health: 2,
     keywords: [],
-    text: "简单直接的中立单位。",
+    turnEnd: { type: "gain-self-per-friendly", attack: 1, health: 0 },
+    text: "回合结束时：每有 1 个其他友军，便获得 +1 攻击力。",
   },
   {
     id: "tavern-attendant",
@@ -245,8 +271,9 @@ const MINION_POOL = [
     tribe: "中立",
     attack: 1,
     health: 3,
-    keywords: [],
-    text: "朴素但耐打。",
+    keywords: ["deathrattle"],
+    deathrattle: { type: "buff-friendly-tribe", attack: 0, health: 1 },
+    text: "亡语：使你的友军获得 +0/+1。",
   },
   {
     id: "wild-recruit",
@@ -257,7 +284,7 @@ const MINION_POOL = [
     health: 2,
     keywords: [],
     damageTrigger: { type: "gain-stats-when-damaged", attack: 1, health: 0, limit: 1, triggerCount: 0 },
-    text: "受伤后，获得 +1 攻击力。",
+    text: "受伤后：获得 +1 攻击力。",
   },
   {
     id: "tusk-brawler",
@@ -268,7 +295,7 @@ const MINION_POOL = [
     health: 1,
     keywords: [],
     damageTrigger: { type: "gain-stats-when-damaged", attack: 2, health: 0, limit: 1, triggerCount: 0 },
-    text: "受伤后，获得 +2 攻击力。",
+    text: "受伤后：获得 +2 攻击力。",
   },
   {
     id: "moonblade-apprentice",
@@ -278,7 +305,8 @@ const MINION_POOL = [
     attack: 2,
     health: 1,
     keywords: [],
-    text: "轻巧的精灵刺击者。",
+    turnEnd: { type: "gain-self-per-friendly", tribe: "精灵", attack: 1, health: 0 },
+    text: "回合结束时：每有 1 个其他精灵，便获得 +1 攻击力。",
   },
   {
     id: "grove-guard",
@@ -288,7 +316,8 @@ const MINION_POOL = [
     attack: 1,
     health: 3,
     keywords: [],
-    text: "守住前线的精灵卫士。",
+    turnStart: { type: "buff-adjacent", tribe: "精灵", attack: 0, health: 1 },
+    text: "回合开始时：使相邻的精灵获得 +0/+1。",
   },
   {
     id: "wasteland-hound",
@@ -298,7 +327,14 @@ const MINION_POOL = [
     attack: 3,
     health: 2,
     keywords: ["taunt"],
-    text: "嘲讽。",
+    damageTrigger: {
+      type: "buff-friendly-tribe-when-damaged",
+      tribe: "野兽",
+      attack: 1,
+      health: 0,
+      includeSource: false,
+    },
+    text: "嘲讽。受伤后：使其他野兽获得 +1 攻击力。",
   },
   {
     id: "molten-brute",
@@ -308,7 +344,8 @@ const MINION_POOL = [
     attack: 3,
     health: 2,
     keywords: [],
-    text: "以血换压制的恶魔战士。",
+    damageTrigger: { type: "deal-random-damage-when-damaged", amount: 1 },
+    text: "受伤后：对 1 个随机敌方随从造成 1 点伤害。",
   },
   {
     id: "inferno-warden",
@@ -318,7 +355,8 @@ const MINION_POOL = [
     attack: 2,
     health: 4,
     keywords: ["taunt"],
-    text: "嘲讽。",
+    turnEnd: { type: "gain-self-per-friendly", tribe: "恶魔", attack: 1, health: 1 },
+    text: "嘲讽。回合结束时：每有 1 个其他恶魔，便获得 +1/+1。",
   },
   {
     id: "rivet-gunner",
@@ -329,7 +367,7 @@ const MINION_POOL = [
     health: 3,
     keywords: [],
     combatStart: { type: "deal-random-damage", amount: 1 },
-    text: "战斗开始时，对一个敌方随从造成 1 点伤害。",
+    text: "战斗开始时：对 1 个敌方随从造成 1 点伤害。",
   },
   {
     id: "royal-lancer",
@@ -339,7 +377,8 @@ const MINION_POOL = [
     attack: 3,
     health: 3,
     keywords: ["provoke"],
-    text: "挑衅。",
+    turnStart: { type: "gain-self-per-friendly", tribe: "人类", attack: 1, health: 0 },
+    text: "挑衅。回合开始时：每有 1 个其他人类，便获得 +1 攻击力。",
   },
   {
     id: "bone-stitcher",
@@ -349,8 +388,8 @@ const MINION_POOL = [
     attack: 2,
     health: 3,
     keywords: ["deathrattle"],
-    deathrattle: { type: "summon", minionId: "skeleton-soldier", count: 1 },
-    text: "亡语：召唤一个 1/1 骸骨步卒。",
+    deathrattle: { type: "buff-friendly-tribe", tribe: "亡灵", attack: 0, health: 1 },
+    text: "亡语：使你的亡灵获得 +0/+1。",
   },
   {
     id: "arena-veteran",
@@ -360,7 +399,8 @@ const MINION_POOL = [
     attack: 3,
     health: 3,
     keywords: [],
-    text: "身材扎实的中立打手。",
+    turnEnd: { type: "buff-random-friendly", count: 1, attack: 1, health: 1 },
+    text: "回合结束时：随机使 1 个友军获得 +1/+1。",
   },
   {
     id: "cleaver-warrior",
@@ -371,7 +411,7 @@ const MINION_POOL = [
     health: 2,
     keywords: [],
     damageTrigger: { type: "gain-stats-when-damaged", attack: 2, health: 0, limit: 2, triggerCount: 0 },
-    text: "受伤后，获得 +2 攻击力。",
+    text: "受伤后：获得 +2 攻击力。",
   },
   {
     id: "camp-guardian",
@@ -382,7 +422,7 @@ const MINION_POOL = [
     health: 4,
     keywords: ["taunt"],
     damageTrigger: { type: "gain-stats-when-damaged", attack: 1, health: 1, limit: 2, triggerCount: 0 },
-    text: "嘲讽。受伤后，获得 +1/+1。",
+    text: "嘲讽。受伤后：获得 +1/+1。",
   },
   {
     id: "windsong-archer",
@@ -392,7 +432,8 @@ const MINION_POOL = [
     attack: 3,
     health: 2,
     keywords: [],
-    text: "后排输出型精灵。",
+    combatStart: { type: "deal-random-damage-repeat", amount: 1, shots: 2 },
+    text: "战斗开始时：随机对敌方随从造成 1 点伤害两次。",
   },
   {
     id: "canopy-warden",
@@ -402,7 +443,8 @@ const MINION_POOL = [
     attack: 2,
     health: 4,
     keywords: [],
-    text: "能扛能守的精灵前排。",
+    combatStart: { type: "grant-keyword-adjacent", tribe: "精灵", keyword: "taunt" },
+    text: "战斗开始时：使相邻的精灵获得嘲讽。",
   },
   {
     id: "dire-bear",
@@ -412,7 +454,14 @@ const MINION_POOL = [
     attack: 4,
     health: 5,
     keywords: ["taunt"],
-    text: "嘲讽。",
+    damageTrigger: {
+      type: "buff-friendly-tribe-when-damaged",
+      tribe: "野兽",
+      attack: 1,
+      health: 1,
+      includeSource: false,
+    },
+    text: "嘲讽。受伤后：使其他野兽获得 +1/+1。",
   },
   {
     id: "pack-leader",
@@ -433,7 +482,8 @@ const MINION_POOL = [
     attack: 4,
     health: 4,
     keywords: [],
-    text: "稳健的恶魔中坚。",
+    turnEnd: { type: "gain-self-per-friendly", tribe: "恶魔", attack: 1, health: 1 },
+    text: "回合结束时：每有 1 个其他恶魔，便获得 +1/+1。",
   },
   {
     id: "infernal-warlock",
@@ -444,7 +494,7 @@ const MINION_POOL = [
     health: 5,
     keywords: [],
     combatStart: { type: "deal-random-damage", amount: 1 },
-    text: "战斗开始时，对一个敌方随从造成 1 点伤害。",
+    text: "战斗开始时：对 1 个敌方随从造成 1 点伤害。",
   },
   {
     id: "iron-reaper",
@@ -454,7 +504,8 @@ const MINION_POOL = [
     attack: 4,
     health: 3,
     keywords: ["divineShield"],
-    text: "圣盾。",
+    combatStart: { type: "buff-adjacent", tribe: "机械", attack: 1, health: 1 },
+    text: "圣盾。战斗开始时：使相邻的机械获得 +1/+1。",
   },
   {
     id: "oath-knight",
@@ -464,7 +515,8 @@ const MINION_POOL = [
     attack: 4,
     health: 4,
     keywords: ["divineShield"],
-    text: "圣盾。",
+    combatStart: { type: "grant-keyword-adjacent", tribe: "人类", keyword: "provoke" },
+    text: "圣盾。战斗开始时：使相邻的人类获得挑衅。",
   },
   {
     id: "grave-lord",
@@ -484,8 +536,9 @@ const MINION_POOL = [
     tribe: "亡灵",
     attack: 5,
     health: 3,
-    keywords: [],
-    text: "高压制的亡灵输出。",
+    keywords: ["deathrattle"],
+    deathrattle: { type: "buff-friendly-tribe", tribe: "亡灵", attack: 2, health: 0 },
+    text: "亡语：使你的亡灵获得 +2 攻击力。",
   },
   {
     id: "mercenary-captain",
@@ -495,7 +548,8 @@ const MINION_POOL = [
     attack: 4,
     health: 4,
     keywords: [],
-    text: "朴实可靠的中立中坚。",
+    turnEnd: { type: "buff-random-friendly", count: 2, attack: 1, health: 1 },
+    text: "回合结束时：随机使 2 个友军获得 +1/+1。",
   },
   {
     id: "dune-lizard",
@@ -505,7 +559,8 @@ const MINION_POOL = [
     attack: 5,
     health: 3,
     keywords: [],
-    text: "高攻的野性中立单位。",
+    damageTrigger: { type: "gain-stats-when-damaged", attack: 1, health: 1, limit: 1, triggerCount: 0 },
+    text: "受伤后：获得 +1/+1。",
   },
   {
     id: "warsong-vanguard",
@@ -515,14 +570,14 @@ const MINION_POOL = [
     attack: 4,
     health: 4,
     keywords: [],
-    combatStart: {
+    turnEnd: {
       type: "buff-friendly-tribe",
       tribe: "兽人",
       attack: 1,
       health: 1,
       includeSource: true,
     },
-    text: "战斗开始时，使你的兽人获得 +1/+1。",
+    text: "回合结束时：使你的兽人获得 +1/+1。",
   },
   {
     id: "starlight-priest",
@@ -532,7 +587,8 @@ const MINION_POOL = [
     attack: 3,
     health: 5,
     keywords: [],
-    text: "偏防守的精灵支援者。",
+    turnEnd: { type: "buff-random-friendly", tribe: "精灵", count: 2, attack: 0, health: 1 },
+    text: "回合结束时：随机使 2 个精灵获得 +0/+1。",
   },
   {
     id: "ember-imp",
@@ -543,7 +599,7 @@ const MINION_POOL = [
     health: 1,
     keywords: [],
     combatStart: { type: "deal-random-damage-repeat", amount: 1, shots: 2 },
-    text: "战斗开始时，随机对敌方随从造成 1 点伤害两次。",
+    text: "战斗开始时：随机对敌方随从造成 1 点伤害两次。",
   },
   {
     id: "grave-apprentice",
@@ -553,8 +609,8 @@ const MINION_POOL = [
     attack: 1,
     health: 2,
     keywords: ["deathrattle"],
-    deathrattle: { type: "summon", minionId: "skeleton-soldier", count: 1 },
-    text: "亡语：召唤一个 1/1 骸骨步卒。",
+    deathrattle: { type: "buff-friendly-tribe", tribe: "亡灵", attack: 1, health: 0 },
+    text: "亡语：使你的亡灵获得 +1 攻击力。",
   },
   {
     id: "gear-squire",
@@ -564,7 +620,8 @@ const MINION_POOL = [
     attack: 1,
     health: 3,
     keywords: ["divineShield"],
-    text: "圣盾。",
+    combatStart: { type: "grant-keyword-adjacent", tribe: "机械", keyword: "divineShield" },
+    text: "圣盾。战斗开始时：使相邻的机械获得圣盾。",
   },
   {
     id: "thorn-guard",
@@ -573,8 +630,9 @@ const MINION_POOL = [
     tribe: "野兽",
     attack: 3,
     health: 4,
-    keywords: ["taunt"],
-    text: "嘲讽。",
+    keywords: ["taunt", "deathrattle"],
+    deathrattle: { type: "buff-friendly-tribe", tribe: "野兽", attack: 0, health: 2 },
+    text: "嘲讽。亡语：使你的野兽获得 +0/+2。",
   },
   {
     id: "oath-centurion",
@@ -584,7 +642,8 @@ const MINION_POOL = [
     attack: 3,
     health: 3,
     keywords: ["provoke"],
-    text: "挑衅。",
+    combatStart: { type: "buff-adjacent", tribe: "人类", attack: 1, health: 0 },
+    text: "挑衅。战斗开始时：使相邻的人类获得 +1 攻击力。",
   },
   {
     id: "market-guard",
@@ -594,7 +653,8 @@ const MINION_POOL = [
     attack: 3,
     health: 4,
     keywords: ["taunt"],
-    text: "嘲讽。",
+    combatStart: { type: "buff-random-friendly", count: 1, attack: 1, health: 1 },
+    text: "嘲讽。战斗开始时：随机使 1 个友军获得 +1/+1。",
   },
   {
     id: "war-horn-drummer",
@@ -604,7 +664,8 @@ const MINION_POOL = [
     attack: 4,
     health: 4,
     keywords: ["provoke"],
-    text: "挑衅。",
+    combatStart: { type: "grant-keyword-adjacent", tribe: "兽人", keyword: "provoke" },
+    text: "挑衅。战斗开始时：使相邻的兽人获得挑衅。",
   },
   {
     id: "moonlit-scout",
@@ -615,7 +676,7 @@ const MINION_POOL = [
     health: 4,
     keywords: [],
     combatStart: { type: "deal-random-damage", amount: 1 },
-    text: "战斗开始时，对一个敌方随从造成 1 点伤害。",
+    text: "战斗开始时：对 1 个敌方随从造成 1 点伤害。",
   },
   {
     id: "thunderhide-alpha",
@@ -625,14 +686,14 @@ const MINION_POOL = [
     attack: 6,
     health: 6,
     keywords: [],
-    combatStart: {
+    turnEnd: {
       type: "buff-friendly-tribe",
       tribe: "野兽",
       attack: 2,
       health: 1,
       includeSource: true,
     },
-    text: "战斗开始时，使你的野兽获得 +2/+1。",
+    text: "回合结束时：使你的野兽获得 +2/+1。",
   },
   {
     id: "felforge-raider",
@@ -642,7 +703,8 @@ const MINION_POOL = [
     attack: 6,
     health: 5,
     keywords: ["provoke"],
-    text: "挑衅。",
+    damageTrigger: { type: "deal-random-damage-when-damaged", amount: 2 },
+    text: "挑衅。受伤后：对 1 个随机敌方随从造成 2 点伤害。",
   },
   {
     id: "gearstorm-artillery",
@@ -653,7 +715,7 @@ const MINION_POOL = [
     health: 5,
     keywords: [],
     combatStart: { type: "deal-random-damage", amount: 3 },
-    text: "战斗开始时，对一个敌方随从造成 3 点伤害。",
+    text: "战斗开始时：对 1 个敌方随从造成 3 点伤害。",
   },
   {
     id: "dawnshield-captain",
@@ -663,14 +725,14 @@ const MINION_POOL = [
     attack: 5,
     health: 6,
     keywords: [],
-    combatStart: {
+    turnEnd: {
       type: "buff-friendly-tribe",
       tribe: "人类",
       attack: 1,
       health: 2,
       includeSource: true,
     },
-    text: "战斗开始时，使你的人类获得 +1/+2。",
+    text: "回合结束时：使你的人类获得 +1/+2。",
   },
   {
     id: "bloodfury-brute",
@@ -681,7 +743,7 @@ const MINION_POOL = [
     health: 6,
     keywords: ["taunt"],
     damageTrigger: { type: "gain-stats-when-damaged", attack: 2, health: 1, limit: 3, triggerCount: 0 },
-    text: "嘲讽。受伤后，获得 +2/+1。",
+    text: "嘲讽。受伤后：获得 +2/+1。",
   },
   {
     id: "crypt-warden",
@@ -703,7 +765,14 @@ const MINION_POOL = [
     attack: 7,
     health: 8,
     keywords: ["cleave", "taunt"],
-    text: "顺劈，嘲讽。",
+    damageTrigger: {
+      type: "buff-friendly-tribe-when-damaged",
+      tribe: "野兽",
+      attack: 1,
+      health: 1,
+      includeSource: false,
+    },
+    text: "顺劈、嘲讽。受伤后：使其他野兽获得 +1/+1。",
   },
   {
     id: "hellfire-magus",
@@ -714,7 +783,7 @@ const MINION_POOL = [
     health: 7,
     keywords: [],
     combatStart: { type: "deal-all-damage", amount: 1 },
-    text: "战斗开始时，对所有敌方随从造成 1 点伤害。",
+    text: "战斗开始时：对所有敌方随从造成 1 点伤害。",
   },
   {
     id: "ironclad-bastion",
@@ -730,7 +799,7 @@ const MINION_POOL = [
       keyword: "divineShield",
       includeSource: true,
     },
-    text: "战斗开始时，使你的机械获得圣盾。",
+    text: "战斗开始时：使你的机械获得圣盾。",
   },
   {
     id: "kingsguard-marshal",
@@ -746,7 +815,7 @@ const MINION_POOL = [
       keyword: "provoke",
       includeSource: false,
     },
-    text: "挑衅。战斗开始时，使你的其他人类获得挑衅。",
+    text: "挑衅。战斗开始时：使你的其他人类获得挑衅。",
   },
   {
     id: "clan-banner-chief",
@@ -762,7 +831,7 @@ const MINION_POOL = [
       keyword: "provoke",
       includeSource: true,
     },
-    text: "战斗开始时，使你的兽人获得挑衅。",
+    text: "战斗开始时：使你的兽人获得挑衅。",
   },
   {
     id: "grave-summoner",
@@ -778,7 +847,7 @@ const MINION_POOL = [
       keyword: "reborn",
       includeSource: false,
     },
-    text: "战斗开始时，使你的其他亡灵获得复生。",
+    text: "战斗开始时：使你的其他亡灵获得复生。",
   },
   {
     id: "oakheart-elder",
@@ -788,14 +857,14 @@ const MINION_POOL = [
     attack: 6,
     health: 8,
     keywords: ["taunt"],
-    combatStart: {
+    turnEnd: {
       type: "buff-friendly-tribe",
       tribe: "精灵",
       attack: 2,
       health: 1,
       includeSource: true,
     },
-    text: "嘲讽。战斗开始时，使你的精灵获得 +2/+1。",
+    text: "嘲讽。回合结束时：使你的精灵获得 +2/+1。",
   },
   {
     id: "starfall-ranger",
@@ -806,7 +875,7 @@ const MINION_POOL = [
     health: 5,
     keywords: [],
     combatStart: { type: "deal-random-damage-repeat", amount: 1, shots: 3 },
-    text: "战斗开始时，随机对敌方随从造成 1 点伤害三次。",
+    text: "战斗开始时：随机对敌方随从造成 1 点伤害三次。",
   },
   {
     id: "primal-colossus",
@@ -816,7 +885,14 @@ const MINION_POOL = [
     attack: 8,
     health: 9,
     keywords: ["poisonous", "taunt"],
-    text: "剧毒，嘲讽。",
+    damageTrigger: {
+      type: "buff-friendly-tribe-when-damaged",
+      tribe: "野兽",
+      attack: 2,
+      health: 1,
+      includeSource: false,
+    },
+    text: "剧毒、嘲讽。受伤后：使其他野兽获得 +2/+1。",
   },
   {
     id: "abyssal-overlord",
@@ -826,7 +902,8 @@ const MINION_POOL = [
     attack: 8,
     health: 8,
     keywords: ["provoke"],
-    text: "挑衅。",
+    turnEnd: { type: "gain-self-per-friendly", tribe: "恶魔", attack: 1, health: 1 },
+    text: "挑衅。回合结束时：每有 1 个其他恶魔，便获得 +1/+1。",
   },
   {
     id: "siege-colossus",
@@ -837,7 +914,7 @@ const MINION_POOL = [
     health: 9,
     keywords: [],
     combatStart: { type: "deal-all-damage", amount: 1 },
-    text: "战斗开始时，对所有敌方随从造成 1 点伤害。",
+    text: "战斗开始时：对所有敌方随从造成 1 点伤害。",
   },
   {
     id: "sunblade-highlord",
@@ -853,7 +930,7 @@ const MINION_POOL = [
       keyword: "divineShield",
       includeSource: false,
     },
-    text: "圣盾。战斗开始时，使你的其他人类获得圣盾。",
+    text: "圣盾。战斗开始时：使你的其他人类获得圣盾。",
   },
   {
     id: "ironhide-warlord",
@@ -864,7 +941,7 @@ const MINION_POOL = [
     health: 8,
     keywords: ["provoke"],
     damageTrigger: { type: "gain-stats-when-damaged", attack: 3, health: 2, limit: 3, triggerCount: 0 },
-    text: "挑衅。受伤后，获得 +3/+2。",
+    text: "挑衅。受伤后：获得 +3/+2。",
   },
   {
     id: "bone-titan",
@@ -876,7 +953,7 @@ const MINION_POOL = [
     keywords: ["deathrattle", "taunt", "reborn"],
     deathrattle: { type: "summon", minionId: "skeleton-soldier", count: 5 },
     reborn: { used: false },
-    text: "复生，嘲讽。亡语：召唤五个 1/1 骸骨步卒。",
+    text: "复生、嘲讽。亡语：召唤五个 1/1 骸骨步卒。",
   },
   {
     id: "moonwell-ancient",
@@ -887,7 +964,7 @@ const MINION_POOL = [
     health: 10,
     keywords: ["taunt"],
     combatStart: { type: "deal-random-damage-repeat", amount: 2, shots: 2 },
-    text: "嘲讽。战斗开始时，随机对敌方随从造成 2 点伤害两次。",
+    text: "嘲讽。战斗开始时：随机对敌方随从造成 2 点伤害两次。",
   },
   {
     id: "mythic-behemoth",
@@ -897,7 +974,14 @@ const MINION_POOL = [
     attack: 9,
     health: 10,
     keywords: ["cleave", "poisonous", "taunt"],
-    text: "顺劈，剧毒，嘲讽。",
+    damageTrigger: {
+      type: "buff-friendly-tribe-when-damaged",
+      tribe: "野兽",
+      attack: 2,
+      health: 2,
+      includeSource: false,
+    },
+    text: "顺劈、剧毒、嘲讽。受伤后：使其他野兽获得 +2/+2。",
   },
   {
     id: "doomfire-archon",
@@ -908,7 +992,7 @@ const MINION_POOL = [
     health: 10,
     keywords: [],
     combatStart: { type: "deal-all-damage", amount: 2 },
-    text: "战斗开始时，对所有敌方随从造成 2 点伤害。",
+    text: "战斗开始时：对所有敌方随从造成 2 点伤害。",
   },
   {
     id: "apocalypse-engine",
@@ -917,8 +1001,9 @@ const MINION_POOL = [
     tribe: "机械",
     attack: 9,
     health: 11,
-    keywords: ["divineShield"],
-    text: "圣盾。",
+    keywords: ["divineShield", "deathrattle"],
+    deathrattle: { type: "deal-random-damage", amount: 4, shots: 2 },
+    text: "圣盾。亡语：随机对敌方随从造成 4 点伤害两次。",
   },
   {
     id: "imperial-paragon",
@@ -935,7 +1020,7 @@ const MINION_POOL = [
       health: 2,
       includeSource: true,
     },
-    text: "挑衅。战斗开始时，使你的人类获得 +2/+2。",
+    text: "挑衅。战斗开始时：使你的人类获得 +2/+2。",
   },
   {
     id: "worldbreaker-khan",
@@ -953,7 +1038,7 @@ const MINION_POOL = [
       includeSource: true,
     },
     damageTrigger: { type: "gain-stats-when-damaged", attack: 3, health: 3, limit: 2, triggerCount: 0 },
-    text: "挑衅。战斗开始时，使你的兽人获得 +2/+2。受伤后，获得 +3/+3。",
+    text: "挑衅。战斗开始时：使你的兽人获得 +2/+2。受伤后：获得 +3/+3。",
   },
   {
     id: "eternal-necrolord",
@@ -971,7 +1056,7 @@ const MINION_POOL = [
       includeSource: true,
     },
     deathrattle: { type: "summon", minionId: "skeleton-soldier", count: 6 },
-    text: "战斗开始时，使你的亡灵获得 +2/+1。亡语：召唤六个 1/1 骸骨步卒。",
+    text: "战斗开始时：使你的亡灵获得 +2/+1。亡语：召唤六个 1/1 骸骨步卒。",
   },
   {
     id: "astral-waywatcher",
@@ -982,7 +1067,7 @@ const MINION_POOL = [
     health: 11,
     keywords: [],
     combatStart: { type: "deal-random-damage-repeat", amount: 4, shots: 3 },
-    text: "战斗开始时，随机对敌方随从造成 4 点伤害三次。",
+    text: "战斗开始时：随机对敌方随从造成 4 点伤害三次。",
   },
   {
     id: "skeleton-soldier",

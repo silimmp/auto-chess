@@ -420,20 +420,20 @@ function testCombatStartDealAllDamage(projectRoot) {
 function testBeastCombatStartBuff(projectRoot) {
   const harness = createHarness(projectRoot);
   harness.run(`
-    const alpha = createOwnedMinion("thunderhide-alpha");
-    const ally = createOwnedMinion("stone-boar");
-    const enemy = createOwnedMinion("tavern-attendant");
-    const result = simulateBattle([alpha, ally], [enemy]);
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.board = [createOwnedMinion("thunderhide-alpha"), createOwnedMinion("stone-boar")];
+    resolveLobbyPhaseEffects(state, "turnEnd", null, pickRandom, randomInt);
+    const result = simulateBattle(state.board, [createOwnedMinion("tavern-attendant")]);
     globalThis.__beastBuffSummary = {
       logs: result.logs,
+      board: state.board.map((minion) => ({ name: minion.name, attack: minion.attack, health: minion.health })),
       remainingPlayer: result.remainingPlayer.map((minion) => ({ name: minion.name, attack: minion.attack, health: minion.health })),
     };
   `);
   const summary = harness.run("__beastBuffSummary");
-  const buffedAlpha = summary.remainingPlayer.find((minion) => minion.name === "雷鬃领主");
-  assert(summary.logs.some((line) => line.includes("鼓舞了")), "野兽开战增幅应写入日志。");
-  assert(summary.logs.some((line) => line.includes("赋予 +2/+1")), "野兽开战增幅日志应包含具体数值。");
-  assert(buffedAlpha || summary.remainingPlayer.length >= 1, "野兽开战增幅后的战斗结果应正常结算。");
+  const buffedAlly = summary.board.find((minion) => minion.name === "石牙野猪");
+  assert(buffedAlly && buffedAlly.attack === 5 && buffedAlly.health === 4, "雷鬃领主应在回合结束时先强化其他野兽。");
+  assert(summary.remainingPlayer.length >= 1, "野兽回合结束增幅后的战斗结果应正常结算。");
 }
 
 function testMechGrantDivineShield(projectRoot) {
@@ -561,11 +561,18 @@ function testOrcDamageTriggers(projectRoot) {
 function testHumanFormationBuffs(projectRoot) {
   const harness = createHarness(projectRoot);
   harness.run(`
-    const captain = createOwnedMinion("dawnshield-captain");
-    const lancer = createOwnedMinion("royal-lancer");
-    const result = simulateBattle([captain, lancer], [createOwnedMinion("tavern-attendant")]);
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.board = [createOwnedMinion("dawnshield-captain"), createOwnedMinion("royal-lancer")];
+    resolveLobbyPhaseEffects(state, "turnEnd", null, pickRandom, randomInt);
+    const result = simulateBattle(state.board, [createOwnedMinion("tavern-attendant")]);
     globalThis.__humanFormationSummary = {
       logs: result.logs,
+      board: state.board.map((minion) => ({
+        name: minion.name,
+        attack: minion.attack,
+        health: minion.health,
+        keywords: [...minion.keywords],
+      })),
       remainingPlayer: result.remainingPlayer.map((minion) => ({
         name: minion.name,
         attack: minion.attack,
@@ -575,9 +582,8 @@ function testHumanFormationBuffs(projectRoot) {
     };
   `);
   const summary = harness.run("__humanFormationSummary");
-  const lancer = summary.remainingPlayer.find((minion) => minion.name === "王城枪兵");
-  assert(summary.logs.some((line) => line.includes("人类友军") && line.includes("+1/+2")), "人类阵线增幅应写入日志。");
-  assert(lancer && lancer.health >= 5, "人类友军应获得曙光盾卫队长的体质增幅。");
+  const lancer = summary.board.find((minion) => minion.name === "王城枪兵");
+  assert(lancer && lancer.attack === 4 && lancer.health === 5, "曙光盾卫队长应在回合结束时为人类提供 +1/+2。");
 }
 
 function testElfRepeatedShots(projectRoot) {
@@ -596,6 +602,138 @@ function testElfRepeatedShots(projectRoot) {
   const summary = harness.run("__elfShotSummary");
   assert(summary.logs.filter((line) => line.includes("第 1 次射击") || line.includes("第 2 次射击") || line.includes("第 3 次射击")).length >= 3, "精灵多段点杀应逐次写入日志。");
   assert(summary.remainingEnemy.length <= 1, "高星精灵多段点杀后应显著削减敌方阵容。");
+}
+
+function testAdjacentCombatStartBuffs(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const result = simulateBattle(
+      [createOwnedMinion("spawn-bot"), createOwnedMinion("iron-reaper"), createOwnedMinion("shield-bot")],
+      []
+    );
+    globalThis.__adjacentBuffSummary = {
+      logs: result.logs,
+      remainingPlayer: result.remainingPlayer.map((minion) => ({
+        name: minion.name,
+        attack: minion.attack,
+        health: minion.health,
+      })),
+    };
+  `);
+  const summary = harness.run("__adjacentBuffSummary");
+  const spawnBot = summary.remainingPlayer.find((minion) => minion.name === "产线机器人");
+  const shieldBot = summary.remainingPlayer.find((minion) => minion.name === "护盾机器人");
+  assert(summary.logs.some((line) => line.includes("钢铁收割者") && line.includes("整顿阵形")), "相邻增益应写入战斗开始日志。");
+  assert(spawnBot && spawnBot.attack === 3 && spawnBot.health === 2, "钢铁收割者应增益左侧相邻机械。");
+  assert(shieldBot && shieldBot.attack === 2 && shieldBot.health === 3, "钢铁收割者应增益右侧相邻机械。");
+}
+
+function testTurnStartBuffs(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.turn = 1;
+    state.board = [createOwnedMinion("alley-cat"), createOwnedMinion("stone-boar"), createOwnedMinion("woodland-wolf")];
+    startNextTurnState(
+      state,
+      (tier) => generateShop(tier, pickRandom),
+      (shop, tier) => refillShop(shop, tier, pickRandom),
+      (turn) => generateEnemyBoard(turn, pickRandom, randomInt),
+      pickRandom,
+      randomInt
+    );
+    globalThis.__turnStartSummary = state.board.map((minion) => ({
+      name: minion.name,
+      attack: minion.attack,
+      health: minion.health,
+    }));
+  `);
+  const summary = harness.run("__turnStartSummary");
+  const cat = summary.find((minion) => minion.name === "巷口野猫");
+  const boar = summary.find((minion) => minion.name === "石牙野猪");
+  const wolf = summary.find((minion) => minion.name === "林地幼狼");
+  assert(cat && cat.attack === 2 && cat.health === 2, "回合开始时，石牙野猪应强化左侧相邻野兽。");
+  assert(boar && boar.attack === 3 && boar.health === 3, "回合开始时，来源随从自身不应被相邻增益影响。");
+  assert(wolf && wolf.attack === 3 && wolf.health === 2, "回合开始时，石牙野猪应强化右侧相邻野兽。");
+}
+
+function testReactiveDamageTrigger(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const result = simulateBattle(
+      [createOwnedMinion("molten-brute")],
+      [createOwnedMinion("tavern-attendant"), createOwnedMinion("tabby-cat")]
+    );
+    globalThis.__reactiveDamageSummary = {
+      logs: result.logs,
+      remainingEnemy: result.remainingEnemy.map((minion) => ({
+        name: minion.name,
+        health: minion.health,
+      })),
+    };
+  `);
+  const summary = harness.run("__reactiveDamageSummary");
+  assert(summary.logs.some((line) => line.includes("熔火狂徒") && line.includes("受伤后反击")), "受伤反击应写入日志。");
+  assert(
+    summary.remainingEnemy.length <= 1 || summary.remainingEnemy.some((minion) => minion.health <= 2),
+    "受伤反击后应击伤或击杀一个敌方单位。"
+  );
+}
+
+function testDeathrattleBuffsFriendlies(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const player = [createOwnedMinion("woodland-wolf"), createOwnedMinion("stone-boar")];
+    const enemy = [];
+    const logs = [];
+    const frames = [];
+    player[0].health = 0;
+    resolveDeathrattle(player, enemy, 0, player[0], player, enemy, "player", logs, frames, "测试");
+    globalThis.__deathrattleBuffSummary = {
+      logs,
+      remainingPlayer: player.map((minion) => ({
+        name: minion.name,
+        attack: minion.attack,
+        health: minion.health,
+      })),
+    };
+  `);
+  const summary = harness.run("__deathrattleBuffSummary");
+  const boar = summary.remainingPlayer.find((minion) => minion.name === "石牙野猪");
+  assert(summary.logs.some((line) => line.includes("林地幼狼") && line.includes("亡语鼓舞")), "亡语增益应写入日志。");
+  assert(boar && boar.attack === 4 && boar.health === 3, "林地幼狼亡语后，其他野兽应获得攻击增益。");
+}
+
+function testTurnEndBuffsBeforeBattle(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.turn = 2;
+    state.board = [createOwnedMinion("arena-veteran"), createOwnedMinion("tavern-attendant")];
+    resolveLobbyPhaseEffects(state, "turnEnd", null, pickRandom, randomInt);
+    const result = simulateBattle(state.board, []);
+    globalThis.__turnEndSummary = {
+      board: state.board.map((minion) => ({
+        name: minion.name,
+        attack: minion.attack,
+        health: minion.health,
+      })),
+      startingPlayer: result.startingPlayer.map((minion) => ({
+        name: minion.name,
+        attack: minion.attack,
+        health: minion.health,
+      })),
+    };
+  `);
+  const summary = harness.run("__turnEndSummary");
+  assert(
+    summary.board.some((minion) => (minion.name === "竞技老兵" || minion.name === "酒馆侍从") && (minion.attack > (minion.name === "竞技老兵" ? 3 : 1) || minion.health > (minion.name === "竞技老兵" ? 3 : 3))),
+    "回合结束时应先结算竞技老兵的增益。"
+  );
+  assert(
+    JSON.stringify(summary.board) === JSON.stringify(summary.startingPlayer),
+    "回合结束增益后的面板属性应直接进入战斗起始快照。"
+  );
 }
 
 function testLobbyBattlePerspective(projectRoot) {
@@ -649,6 +787,11 @@ function main() {
     ["orc-damage-triggers", testOrcDamageTriggers],
     ["human-formation-buffs", testHumanFormationBuffs],
     ["elf-repeated-shots", testElfRepeatedShots],
+    ["adjacent-combat-start-buffs", testAdjacentCombatStartBuffs],
+    ["turn-start-buffs", testTurnStartBuffs],
+    ["reactive-damage-trigger", testReactiveDamageTrigger],
+    ["deathrattle-buffs-friendlies", testDeathrattleBuffsFriendlies],
+    ["turn-end-buffs-before-battle", testTurnEndBuffsBeforeBattle],
     ["lobby-battle-perspective", testLobbyBattlePerspective],
   ];
 

@@ -188,22 +188,7 @@ function removeDefeatedMinions(board, opposingBoard, player, enemy, side, logs, 
       continue;
     }
 
-    const summons = buildDeathrattleSummons(board, minion);
-    board.splice(index, 1, ...summons);
-    pushBattleFrameOnly(player, enemy, frames, {
-      progress,
-      delay: BATTLE_CLEANUP_DELAY_MS,
-    });
-
-    if (summons.length) {
-      const summonMessage = `${sideLabel} ${minion.name} 的亡语生效，召唤了 ${summons.length} 个单位。`;
-      pushBattleLogFrame(player, enemy, logs, frames, summonMessage, {
-        progress,
-        delay: BATTLE_CLEANUP_DELAY_MS,
-      });
-    }
-
-    index += summons.length;
+    index += resolveDeathrattle(board, opposingBoard, index, minion, player, enemy, side, logs, frames, progress);
   }
 }
 
