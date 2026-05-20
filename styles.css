@@ -911,14 +911,14 @@ body::after {
 .prep-hand-zone:focus-within .hand-row .minion-card,
 .hand-row:focus-within .minion-card {
   margin-left: -14px;
-  transform: translateX(0) translateY(-8px) rotate(0deg) scale(0.96);
+  transform: translateX(0) translateY(-18px) rotate(0deg) scale(1.08);
 }
 
 .hand-row .minion-card:hover,
 .hand-row .minion-card:focus-within,
 .hand-row .minion-card.drag-source {
   z-index: 32;
-  transform: translateX(0) translateY(-12px) rotate(0deg) scale(0.99);
+  transform: translateX(0) translateY(-24px) rotate(0deg) scale(1.14);
 }
 
 .hand-row[data-hand-count="1"] .minion-card {
@@ -1799,6 +1799,19 @@ body::after {
   .hand-row .minion-card {
     --fan-lift: 12px;
     min-height: 140px;
+  }
+
+  .prep-hand-zone:hover .hand-row .minion-card,
+  .prep-hand-zone.drop-target .hand-row .minion-card,
+  .prep-hand-zone:focus-within .hand-row .minion-card,
+  .hand-row:focus-within .minion-card {
+    transform: translateX(0) translateY(-14px) rotate(0deg) scale(1.02);
+  }
+
+  .hand-row .minion-card:hover,
+  .hand-row .minion-card:focus-within,
+  .hand-row .minion-card.drag-source {
+    transform: translateX(0) translateY(-18px) rotate(0deg) scale(1.07);
   }
 
   .hand-tray-hotspot {
