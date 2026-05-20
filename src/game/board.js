@@ -1,8 +1,25 @@
-function playMinionState(state, index, targetIndex = getCenterInsertIndex(state.board.length)) {
+function playCardFromHandState(state, index, target = {}) {
   if (state.phase !== "prep") {
     return false;
   }
 
+  const card = state.hand[index];
+  if (!card || state.hp <= 0) {
+    return false;
+  }
+  const cardKind = getHandCardKind(card);
+  if (cardKind === "minion") {
+    return playMinionCardFromHandState(state, index, target.targetIndex);
+  }
+  state.message = `这张牌暂时还不能直接打出。`;
+  return true;
+}
+
+function playMinionState(state, index, targetIndex = getCenterInsertIndex(state.board.length)) {
+  return playCardFromHandState(state, index, { targetIndex });
+}
+
+function playMinionCardFromHandState(state, index, targetIndex = getCenterInsertIndex(state.board.length)) {
   const minion = state.hand[index];
   if (!minion || state.hp <= 0) {
     return false;
@@ -19,6 +36,10 @@ function playMinionState(state, index, targetIndex = getCenterInsertIndex(state.
   const merged = resolveTriples(state);
   state.message = buildRecruitMessage(`派出了 ${minion.name}`, merged);
   return true;
+}
+
+function getHandCardKind(card) {
+  return card?.cardKind || "minion";
 }
 
 function moveHandMinionState(state, index, targetIndex) {

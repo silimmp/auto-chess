@@ -27,9 +27,10 @@ function startGameApp() {
   configureDragRuntime({
     actions: {
       buyMinion,
+      buyMinionToZone,
       moveBoardMinion,
       moveHandMinion,
-      playMinion,
+      playCardFromHand,
       sellMinionFromZone,
     },
     dragState,
@@ -158,8 +159,20 @@ function startGameApp() {
     }
   }
 
+  function buyMinionToZone(shopIndex, targetZone = "hand", targetIndex = null) {
+    if (buyMinionToZoneState(state, shopIndex, targetZone, targetIndex)) {
+      render();
+    }
+  }
+
+  function playCardFromHand(index, targetIndex = getCenterInsertIndex(state.board.length)) {
+    if (playCardFromHandState(state, index, { targetIndex })) {
+      render();
+    }
+  }
+
   function playMinion(index, targetIndex = getCenterInsertIndex(state.board.length)) {
-    if (playMinionState(state, index, targetIndex)) {
+    if (playCardFromHandState(state, index, { targetIndex })) {
       render();
     }
   }

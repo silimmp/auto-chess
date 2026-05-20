@@ -110,6 +110,7 @@ function handleGlobalPointerUp(event) {
     return;
   }
 
+  const wasPending = dragRuntime.dragState.status === "pending";
   const shouldDrop = dragRuntime.dragState.status === "active";
   const payload = shouldDrop
     ? {
@@ -119,10 +120,20 @@ function handleGlobalPointerUp(event) {
         targetIndex: dragRuntime.dragState.currentIndex,
       }
     : null;
+  const tapPurchase =
+    wasPending && dragRuntime.dragState.sourceZone === "shop"
+      ? {
+          sourceIndex: dragRuntime.dragState.sourceIndex,
+        }
+      : null;
 
   cleanupDragState();
   if (shouldDrop && payload) {
     applyCardDrop(payload);
+    return;
+  }
+  if (tapPurchase) {
+    dragRuntime.actions.buyMinion(tapPurchase.sourceIndex);
   }
 }
 
@@ -236,7 +247,41 @@ function getPriorityDropZone(clientX, clientY) {
     return "sell";
   }
 
-  return dragRuntime.dragState.sourceZone === "shop" ? getShopPurchaseZone() : getDropZoneAtPoint(clientX, clientY);
+  if (dragRuntime.dragState.sourceZone === "shop") {
+    return getShopPurchaseZone();
+  }
+  if (dragRuntime.dragState.sourceZone === "hand") {
+    return getHandDeployZone(clientX, clientY);
+  }
+  return getDropZoneAtPoint(clientX, clientY);
+}
+
+function getHandDeployZone(clientX, clientY) {
+  const pointerZone = getDropZoneAtPoint(clientX, clientY);
+  if (pointerZone === "sell" || pointerZone === "board") {
+    return pointerZone;
+  }
+
+  const upwardTravel = dragRuntime.dragState.startY - dragRuntime.dragState.pointerY;
+  if (upwardTravel >= 72) {
+    return "board";
+  }
+
+  const dragRect = getActiveDragRect();
+  const handRect = dragRuntime.prepZones.hand?.getBoundingClientRect();
+  const boardRect = dragRuntime.prepZones.board?.getBoundingClientRect();
+  if (!dragRect || !handRect) {
+    return pointerZone || "";
+  }
+
+  const boardRatio = getOverlapRatio(dragRect, boardRect);
+  const liftedAboveTray = handRect.top - dragRect.top;
+  const escapedTrayBand = dragRect.bottom <= handRect.top + 28;
+  if (boardRatio >= 0.12 || liftedAboveTray >= 36 || escapedTrayBand) {
+    return "board";
+  }
+
+  return "hand";
 }
 
 function isSellDropActive() {
@@ -315,7 +360,7 @@ function applyCardDrop({ sourceZone, sourceIndex, targetZone, targetIndex }) {
 
   if (sourceZone === "shop") {
     if (targetZone === "hand" || targetZone === "board") {
-      dragRuntime.actions.buyMinion(sourceIndex);
+      dragRuntime.actions.buyMinionToZone(sourceIndex, targetZone, targetIndex);
     }
     return;
   }
@@ -326,7 +371,7 @@ function applyCardDrop({ sourceZone, sourceIndex, targetZone, targetIndex }) {
       return;
     }
     if (targetZone === "board") {
-      dragRuntime.actions.playMinion(sourceIndex, targetIndex);
+      dragRuntime.actions.playCardFromHand(sourceIndex, targetIndex);
       return;
     }
     if (targetZone === "hand") {

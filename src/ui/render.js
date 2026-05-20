@@ -122,6 +122,8 @@ function renderShop(state, elements, bindPrepCardInteractions) {
 
 function renderHand(state, elements, bindPrepCardInteractions) {
   elements.hand.innerHTML = "";
+  elements.hand.dataset.handCount = String(state.hand.length);
+  elements.hand.classList.toggle("is-empty", state.hand.length === 0);
 
   if (!state.hand.length) {
     elements.hand.appendChild(makeEmptyCard("手牌空空，买下的随从会先放在这里。"));

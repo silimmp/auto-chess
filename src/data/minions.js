@@ -1105,6 +1105,7 @@ function cloneMinionAbilityFields(minion) {
 
 function createMinionSnapshot(minion, runtimeFields = {}) {
   return {
+    cardKind: "minion",
     id: minion.id,
     name: minion.name,
     tier: minion.tier,

@@ -178,6 +178,30 @@ async function dragCenter(page, sourceSelector, targetSelector, targetOffset = {
   await page.mouse.up();
 }
 
+async function dragByOffset(page, sourceSelector, offset) {
+  const source = await page.locator(sourceSelector).boundingBox();
+  assert(source, `缺少拖拽来源：${sourceSelector}`);
+
+  const startX = source.x + source.width / 2;
+  const startY = source.y + source.height / 2;
+  const endX = startX + offset.x;
+  const endY = startY + offset.y;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(endX, endY, { steps: 14 });
+  await page.mouse.up();
+}
+
+async function moveMouseToSelector(page, selector, offset = { x: 0, y: 0 }) {
+  const target = await page.locator(selector).boundingBox();
+  assert(target, `缺少目标元素：${selector}`);
+
+  const x = target.x + target.width / 2 + offset.x;
+  const y = target.y + target.height / 2 + offset.y;
+  await page.mouse.move(x, y, { steps: 8 });
+}
+
 async function waitForPrepTurn(page, expectedTurn, timeout = 12000) {
   await page.waitForFunction(
     (turn) =>
@@ -295,6 +319,21 @@ async function main() {
         assert(afterPlay.hand === 0, "上阵后手牌应为空。");
         assert(afterPlay.board === 1, "上阵后战场应有 1 个单位。");
         return { afterBuy, afterPlay };
+      })
+    );
+
+    results.push(
+      await runScenario("hand-fan-deploy", browser, url, async (page) => {
+        await dragCenter(page, "#shop-board .minion-card:nth-child(1)", "#hand-board");
+        await moveMouseToSelector(page, ".prep-hand-zone", { x: 0, y: 54 });
+        const expanded = await page.locator(".prep-hand-zone").evaluate((element) => element.matches(":hover"));
+        assert(expanded, "鼠标扫到手牌热区后应命中手牌区。");
+
+        await dragByOffset(page, "#hand-board .minion-card:nth-child(1)", { x: 0, y: -170 });
+        const afterDeploy = await collectPrepCounts(page);
+        assert(afterDeploy.hand === 0, "拖出手牌托盘后应成功打出。");
+        assert(afterDeploy.board === 1, "拖出手牌托盘后应进入战场。");
+        return { afterDeploy, expanded };
       })
     );
 

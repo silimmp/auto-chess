@@ -21,6 +21,10 @@ function toggleFreezeShopState(state) {
 }
 
 function buyMinionState(state, shopIndex) {
+  return buyMinionToZoneState(state, shopIndex, "hand");
+}
+
+function buyMinionToZoneState(state, shopIndex, targetZone = "hand", targetIndex = null) {
   if (state.phase !== "prep") {
     return false;
   }
@@ -33,7 +37,14 @@ function buyMinionState(state, shopIndex) {
     state.message = "金币不够，先忍一手。";
     return true;
   }
-  if (state.hand.length >= HAND_LIMIT) {
+  if (targetZone === "board" && state.board.length >= BOARD_LIMIT) {
+    if (state.hand.length >= HAND_LIMIT) {
+      state.message = "战队和手牌都满了，先腾位置。";
+      return true;
+    }
+    targetZone = "hand";
+  }
+  if (state.hand.length >= HAND_LIMIT && targetZone !== "board") {
     state.message = "手牌已满，先处理一下手牌。";
     return true;
   }
@@ -41,10 +52,17 @@ function buyMinionState(state, shopIndex) {
   state.gold -= BUY_COST;
   state.shop.splice(shopIndex, 1);
   const purchasedMinion = createOwnedMinion(shopMinion.id);
-  state.hand.push(purchasedMinion);
+  if (targetZone === "board") {
+    const insertIndex = normalizeInsertIndex(targetIndex, state.board.length);
+    state.board.splice(insertIndex, 0, purchasedMinion);
+  } else {
+    state.hand.push(purchasedMinion);
+  }
 
   const merged = resolveTriples(state);
-  state.message = buildRecruitMessage(`买下了 ${shopMinion.name}，已置入手牌`, merged);
+  const baseMessage =
+    targetZone === "board" ? `买下了 ${shopMinion.name}，已直接派上战场` : `买下了 ${shopMinion.name}，已置入手牌`;
+  state.message = buildRecruitMessage(baseMessage, merged);
   return true;
 }
 
