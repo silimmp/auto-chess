@@ -219,10 +219,11 @@ function testBuyPlayAndFreeze(projectRoot) {
   assert(frozenState.frozen === false, "进入下一回合后冻结状态应被清空。");
   assert(frozenState.firstId === firstShopId, "冻结商店后原有卡牌未保留。");
 
-  harness.run("buyMinionState(window.__AUTO_CHESS_TEST_API__.state, 0)");
-  const afterBuy = harness.run("({ gold: window.__AUTO_CHESS_TEST_API__.state.gold, handLen: window.__AUTO_CHESS_TEST_API__.state.hand.length, shopLen: window.__AUTO_CHESS_TEST_API__.state.shop.length })");
+  harness.run("buyMinionToZoneState(window.__AUTO_CHESS_TEST_API__.state, 0, 'board', 0)");
+  const afterBuy = harness.run("({ gold: window.__AUTO_CHESS_TEST_API__.state.gold, handLen: window.__AUTO_CHESS_TEST_API__.state.hand.length, boardLen: window.__AUTO_CHESS_TEST_API__.state.board.length, shopLen: window.__AUTO_CHESS_TEST_API__.state.shop.length })");
   assert(afterBuy.gold === 1, "第二回合买牌后金币应为 1。");
-  assert(afterBuy.handLen === 1, "买牌后手牌数量异常。");
+  assert(afterBuy.handLen === 1, "买牌后应先进入手牌。");
+  assert(afterBuy.boardLen === 0, "买牌阶段不应直接上场。");
   assert(afterBuy.shopLen === 4, "买牌后商店数量异常。");
 
   harness.run("playMinionState(window.__AUTO_CHESS_TEST_API__.state, 0, 0)");
@@ -241,10 +242,11 @@ function testMultipleTriples(projectRoot) {
     }
     resolveTriples(window.__AUTO_CHESS_TEST_API__.state);
   `);
-  const summary = harness.run("({ handLen: window.__AUTO_CHESS_TEST_API__.state.hand.length, boardLen: window.__AUTO_CHESS_TEST_API__.state.board.length, goldenCount: window.__AUTO_CHESS_TEST_API__.state.hand.filter((minion) => minion.golden).length })");
-  assert(summary.handLen === 2, "六张同名随从应合成两张金色。");
+  const summary = harness.run("({ handLen: window.__AUTO_CHESS_TEST_API__.state.hand.length, boardLen: window.__AUTO_CHESS_TEST_API__.state.board.length, goldenCount: window.__AUTO_CHESS_TEST_API__.state.hand.filter((minion) => minion.golden).length, rewardCount: window.__AUTO_CHESS_TEST_API__.state.hand.filter((card) => card.cardKind === 'tripleReward').length })");
+  assert(summary.handLen === 4, "六张同名随从应合成两张金色并附带两张奖励牌。");
   assert(summary.boardLen === 0, "该用例不应影响战场。");
   assert(summary.goldenCount === 2, "连续三连未全部结算。");
+  assert(summary.rewardCount === 2, "连续三连后应得到对应数量的奖励牌。");
 }
 
 function testCombatStartDeadMinion(projectRoot) {

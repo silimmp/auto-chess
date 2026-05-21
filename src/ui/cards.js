@@ -1,5 +1,5 @@
 function buildMinionCard(minion, options = {}) {
-  const { battle = false, showActions = true, slotLabel = "", battleVisual = null } = options;
+  const { battle = false, showActions = true, battleVisual = null } = options;
   const healthValue = Math.max(0, minion.health);
   const healthClass = healthValue <= 0 ? "zero" : healthValue <= 2 ? "low" : "";
   const battleStateClasses = battleVisual
@@ -41,7 +41,6 @@ function buildMinionCard(minion, options = {}) {
   const battleTop = battle
     ? `
       <div class="battle-card-top">
-        <span class="battle-slot">${slotLabel}</span>
         ${battleVisual?.roleLabel ? `<span class="battle-role ${battleVisual.roleClass}">${battleVisual.roleLabel}</span>` : ""}
       </div>
     `
@@ -84,6 +83,40 @@ function buildMinionCard(minion, options = {}) {
   `;
 
   return card;
+}
+
+function buildHandCard(card, options = {}) {
+  if (card?.cardKind === "tripleReward") {
+    return buildTripleRewardCard(card, options);
+  }
+  return buildMinionCard(card, options);
+}
+
+function buildTripleRewardCard(card, options = {}) {
+  const { showActions = true } = options;
+  const rewardTier = Math.min(CONTENT_TIER_CAP, card.rewardTier ?? CONTENT_TIER_CAP);
+  const reward = document.createElement("article");
+  reward.className = "minion-card reward-card";
+  reward.innerHTML = `
+    <div class="minion-main">
+      <div class="minion-header">
+        <span class="tier-badge reward-badge">奖励</span>
+        <div class="minion-title-block">
+          <h3 class="minion-name">${card.name || "三连奖励"}</h3>
+        </div>
+      </div>
+      <p class="reward-text">${card.text || "打出：获得一张奖励随从。"}</p>
+      <div class="keyword-row">
+        <span class="keyword reward-keyword">法术</span>
+      </div>
+    </div>
+    <div class="minion-footer">
+      <div class="minion-meta">当前可得 ${rewardTier} 星随从</div>
+      <div class="reward-cta">拖到战场领取奖励</div>
+      ${showActions ? '<div class="card-actions"></div>' : ""}
+    </div>
+  `;
+  return reward;
 }
 
 function makeEmptyCard(text) {

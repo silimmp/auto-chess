@@ -11,6 +11,9 @@ function playCardFromHandState(state, index, target = {}) {
   if (cardKind === "minion") {
     return playMinionCardFromHandState(state, index, target.targetIndex);
   }
+  if (cardKind === "tripleReward") {
+    return playTripleRewardCardFromHandState(state, index);
+  }
   state.message = `这张牌暂时还不能直接打出。`;
   return true;
 }
@@ -35,6 +38,40 @@ function playMinionCardFromHandState(state, index, targetIndex = getCenterInsert
 
   const merged = resolveTriples(state);
   state.message = buildRecruitMessage(`派出了 ${minion.name}`, merged);
+  return true;
+}
+
+function playTripleRewardCardFromHandState(state, index) {
+  const card = state.hand[index];
+  if (!card || state.hp <= 0) {
+    return false;
+  }
+
+  state.hand.splice(index, 1);
+  state.discover = {
+    source: "tripleReward",
+    rewardTier: card.rewardTier,
+    choices: createTripleRewardChoices(card.rewardTier),
+  };
+  state.message = `打出了 ${card.name}，请选择一张 ${card.rewardTier} 星奖励随从。`;
+  return true;
+}
+
+function chooseDiscoverRewardState(state, choiceIndex) {
+  if (state.phase !== "prep" || !state.discover?.choices?.[choiceIndex]) {
+    return false;
+  }
+
+  const chosen = copyMinion(state.discover.choices[choiceIndex]);
+  state.discover = null;
+
+  if (state.hand.length >= HAND_LIMIT) {
+    state.message = `你选择了 ${chosen.name}，但手牌已满，奖励随从未能加入手牌。`;
+    return true;
+  }
+
+  state.hand.unshift(chosen);
+  state.message = `你选择了 ${chosen.name}，奖励随从已加入手牌。`;
   return true;
 }
 
@@ -127,8 +164,11 @@ function resolveTriples(state) {
     const base = triple[0].minion;
     removeOwnedEntries(state, triple);
     const golden = createGoldenMinion(base);
+    const rewardTier = Math.min(CONTENT_TIER_CAP, base.tier + 1);
+    const rewardCard = createTripleRewardCard(rewardTier);
     state.hand.unshift(golden);
-    merged.push(golden);
+    state.hand.unshift(rewardCard);
+    merged.push({ golden, rewardCard });
   }
 }
 
@@ -179,5 +219,5 @@ function buildRecruitMessage(baseMessage, mergedMinions) {
   if (!mergedMinions.length) {
     return `${baseMessage}。`;
   }
-  return `${baseMessage}，触发了 ${mergedMinions.length} 次三连合成，金色随从已进入手牌。`;
+  return `${baseMessage}，触发了 ${mergedMinions.length} 次三连合成，金色随从和三连奖励已进入手牌。`;
 }

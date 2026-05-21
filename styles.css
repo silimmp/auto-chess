@@ -408,17 +408,6 @@ body::after {
   transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.prep-zone::before {
-  content: "";
-  position: absolute;
-  top: 10px;
-  left: 14px;
-  right: 14px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 239, 208, 0.7), transparent);
-  pointer-events: none;
-}
-
 .prep-zone.drop-target {
   background:
     linear-gradient(180deg, rgba(255, 220, 145, 0.22), rgba(255, 247, 228, 0.5)),
@@ -603,7 +592,7 @@ body::after {
 
 .compact-countdown {
   position: absolute;
-  top: 0;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
   width: min(100%, 148px);
@@ -887,9 +876,9 @@ body::after {
 .hand-row .minion-card {
   --fan-offset: 0px;
   --fan-rotate: 0deg;
-  --fan-lift: 22px;
+  --fan-lift: 18px;
   flex: 0 0 auto;
-  min-height: 146px;
+  min-height: 170px;
   margin-left: -52px;
   transform-origin: center bottom;
   transform: translateX(var(--fan-offset)) translateY(var(--fan-lift)) rotate(var(--fan-rotate)) scale(0.8);
@@ -911,14 +900,14 @@ body::after {
 .prep-hand-zone:focus-within .hand-row .minion-card,
 .hand-row:focus-within .minion-card {
   margin-left: -14px;
-  transform: translateX(0) translateY(-18px) rotate(0deg) scale(1.08);
+  transform: translateX(0) translateY(-18px) rotate(0deg) scale(1);
 }
 
 .hand-row .minion-card:hover,
 .hand-row .minion-card:focus-within,
 .hand-row .minion-card.drag-source {
   z-index: 32;
-  transform: translateX(0) translateY(-24px) rotate(0deg) scale(1.14);
+  transform: translateX(0) translateY(-22px) rotate(0deg) scale(1.03);
 }
 
 .hand-row[data-hand-count="1"] .minion-card {
@@ -1136,6 +1125,46 @@ body::after {
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.28), transparent 38%),
     linear-gradient(180deg, rgba(255, 248, 206, 0.34), rgba(255, 255, 255, 0));
+}
+
+.reward-card {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.52), transparent 42%),
+    linear-gradient(180deg, rgba(255, 244, 202, 0.98), rgba(232, 197, 109, 0.98)),
+    linear-gradient(135deg, rgba(255, 226, 126, 0.24), transparent 70%);
+  border-color: rgba(170, 119, 8, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 16px 28px rgba(135, 95, 20, 0.18);
+}
+
+.reward-badge {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 24%),
+    rgba(156, 96, 17, 0.9);
+}
+
+.reward-keyword {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 20%),
+    rgba(133, 82, 17, 0.92);
+}
+
+.reward-text {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(69, 40, 17, 0.88);
+  text-align: center;
+}
+
+.reward-cta {
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: rgba(101, 63, 20, 0.74);
 }
 
 .minion-card.battle-card {
@@ -1505,6 +1534,74 @@ body::after {
   display: none;
 }
 
+.discover-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(44, 24, 16, 0.26);
+  backdrop-filter: blur(10px);
+}
+
+.discover-overlay.hidden {
+  display: none;
+}
+
+.discover-panel {
+  width: min(1080px, calc(100vw - 80px));
+  padding: 28px 26px 30px;
+  border-radius: 28px;
+  border: 1px solid rgba(122, 78, 35, 0.16);
+  background:
+    radial-gradient(circle at top, rgba(255, 228, 162, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(255, 247, 228, 0.96), rgba(233, 214, 182, 0.98));
+  box-shadow:
+    0 24px 52px rgba(28, 16, 12, 0.28),
+    inset 0 1px 0 rgba(255, 251, 239, 0.46);
+}
+
+.discover-title {
+  margin: 8px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 28px;
+  color: #4d2c18;
+}
+
+.discover-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: rgba(78, 51, 31, 0.74);
+}
+
+.discover-choices {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.discover-choice {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.discover-choice .minion-card {
+  width: 100%;
+}
+
+.discover-choice:hover .minion-card,
+.discover-choice:focus-visible .minion-card {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 22px 34px rgba(74, 44, 13, 0.2);
+}
+
 .battle-overlay-panel {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
@@ -1798,20 +1895,20 @@ body::after {
 
   .hand-row .minion-card {
     --fan-lift: 12px;
-    min-height: 140px;
+    min-height: 170px;
   }
 
   .prep-hand-zone:hover .hand-row .minion-card,
   .prep-hand-zone.drop-target .hand-row .minion-card,
   .prep-hand-zone:focus-within .hand-row .minion-card,
   .hand-row:focus-within .minion-card {
-    transform: translateX(0) translateY(-14px) rotate(0deg) scale(1.02);
+    transform: translateX(0) translateY(-14px) rotate(0deg) scale(1);
   }
 
   .hand-row .minion-card:hover,
   .hand-row .minion-card:focus-within,
   .hand-row .minion-card.drag-source {
-    transform: translateX(0) translateY(-18px) rotate(0deg) scale(1.07);
+    transform: translateX(0) translateY(-18px) rotate(0deg) scale(1.03);
   }
 
   .hand-tray-hotspot {

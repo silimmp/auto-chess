@@ -343,7 +343,7 @@ async function main() {
 
     results.push(
       await runScenario("drag-buy-play", browser, url, async (page) => {
-        await dragCenter(page, "#shop-board .minion-card:nth-child(1)", "#hand-board");
+        await dragCenter(page, "#shop-board .minion-card:nth-child(1)", "#player-board");
         await page.waitForTimeout(180);
         const afterBuy = await collectPrepCounts(page);
         const collapsedHandVisible = await page.evaluate(() => {
@@ -367,7 +367,8 @@ async function main() {
           };
         });
         assert(afterBuy.gold === "0", "第 1 回合买牌后金币应归零。");
-        assert(afterBuy.hand === 1, "拖拽购买后应进入手牌。");
+        assert(afterBuy.hand === 1, "拖到上场区购买后也应先进入手牌。");
+        assert(afterBuy.board === 0, "买牌阶段不应直接把随从放上场。");
         assert(collapsedHandVisible && collapsedHandVisible.cardVisibleHeight >= 54, "默认收纳状态下手牌露出高度不足。");
         assert(collapsedHandVisible.overStackBottom !== null && collapsedHandVisible.overStackBottom <= 0, "默认收纳状态下手牌超出了共享战备区。");
         assert(collapsedHandVisible.overPanelBottom !== null && collapsedHandVisible.overPanelBottom <= 0, "默认收纳状态下手牌超出了准备阶段主框。");
@@ -500,12 +501,64 @@ async function main() {
         const tripleState = await page.evaluate(() => ({
           goldenCount: document.querySelectorAll("#hand-board .minion-card.golden").length,
           handCount: document.querySelectorAll("#hand-board .minion-card").length,
+          rewardCount: window.__AUTO_CHESS_TEST_API__.state.hand.filter((card) => card.cardKind === "tripleReward").length,
           message: document.querySelector("#message-value")?.textContent?.trim(),
         }));
 
-        assert(tripleState.handCount === 1, "三连后手牌应只剩 1 张牌。");
+        assert(tripleState.handCount === 2, "三连后手牌应包含金色随从和奖励牌。");
         assert(tripleState.goldenCount === 1, "三连后应得到 1 张金色牌。");
+        assert(tripleState.rewardCount === 1, "三连后应得到 1 张奖励牌。");
         return tripleState;
+      })
+    );
+
+    results.push(
+      await runScenario("triple-reward-playout", browser, url, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.gold = 9;
+          api.state.shopFrozen = false;
+          api.state.board = [];
+          api.state.enemyBoard = [];
+          api.state.hand = [api.createOwnedMinion("taunt-guard"), api.createOwnedMinion("taunt-guard")];
+          api.state.shop = [api.copyMinion(api.createOwnedMinion("taunt-guard"))];
+          api.render();
+        });
+
+        await dragCenter(page, "#shop-board .minion-card:nth-child(1)", "#hand-board");
+        await page.waitForTimeout(180);
+        await dragByOffset(page, "#hand-board .minion-card:nth-child(1)", { x: 0, y: -170 }, { xRatio: 0.5, yRatio: 0.22 });
+        await page.waitForTimeout(180);
+
+        const discoverState = await page.evaluate(() => ({
+          choices: document.querySelectorAll("#discover-choices .minion-card").length,
+          discoverOpen: !document.querySelector("#discover-view")?.classList.contains("hidden"),
+          subtitle: document.querySelector("#discover-subtitle")?.textContent?.trim(),
+        }));
+
+        assert(discoverState.discoverOpen, "打出三连奖励牌后应打开奖励选择层。");
+        assert(discoverState.choices === 4, "三连奖励应提供四张可选随从。");
+
+        await page.click("#discover-choices .discover-choice:nth-child(1)");
+
+        const rewardState = await page.evaluate(() => ({
+          discoverOpen: !document.querySelector("#discover-view")?.classList.contains("hidden"),
+          hand: window.__AUTO_CHESS_TEST_API__.state.hand.map((card) => ({
+            cardKind: card.cardKind,
+            tier: card.tier ?? null,
+            name: card.name,
+          })),
+          message: document.querySelector("#message-value")?.textContent?.trim(),
+        }));
+
+        assert(rewardState.discoverOpen === false, "选定奖励后选择层应关闭。");
+        assert(rewardState.hand.length === 2, "打出奖励牌后手牌应剩下金色随从和奖励随从。");
+        assert(rewardState.hand.every((card) => card.cardKind === "minion"), "打出奖励牌后手牌里不应残留奖励牌。");
+        assert(rewardState.hand.some((card) => card.tier === 2), "三连 1 星后应得到 2 星奖励随从。");
+        return { discoverState, rewardState };
       })
     );
 

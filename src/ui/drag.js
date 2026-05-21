@@ -33,7 +33,7 @@ function bindPrepCardInteractions(card, zone, index, disabled) {
 }
 
 function beginCardDragPress(event, zone, index, card) {
-  if (event.button !== 0 || dragRuntime.state.phase !== "prep" || dragRuntime.state.hp <= 0) {
+  if (event.button !== 0 || dragRuntime.state.phase !== "prep" || dragRuntime.state.hp <= 0 || dragRuntime.state.discover) {
     return;
   }
   if (event.target.closest("button")) {
@@ -189,7 +189,7 @@ function updateDropTargetState(clientX, clientY) {
 function getShopPurchaseZone() {
   const pointerZone = getDropZoneAtPoint(dragRuntime.dragState.pointerX, dragRuntime.dragState.pointerY);
   if (pointerZone === "hand" || pointerZone === "board") {
-    return pointerZone;
+    return "hand";
   }
 
   const dragRect = getActiveDragRect();
@@ -200,10 +200,7 @@ function getShopPurchaseZone() {
   const handRatio = getOverlapRatio(dragRect, dragRuntime.prepZones.hand?.getBoundingClientRect());
   const boardRatio = getOverlapRatio(dragRect, dragRuntime.prepZones.board?.getBoundingClientRect());
 
-  if (boardRatio >= 0.28 && boardRatio >= handRatio) {
-    return "board";
-  }
-  if (handRatio >= 0.28) {
+  if (handRatio >= 0.28 || boardRatio >= 0.28) {
     return "hand";
   }
   return "";
@@ -299,7 +296,7 @@ function isValidDropZone(sourceZone, targetZone) {
     return false;
   }
   if (sourceZone === "shop") {
-    return targetZone === "hand" || targetZone === "board";
+    return targetZone === "hand";
   }
   if (sourceZone === "hand") {
     return targetZone === "hand" || targetZone === "board" || targetZone === "sell";
@@ -359,8 +356,8 @@ function applyCardDrop({ sourceZone, sourceIndex, targetZone, targetIndex }) {
   }
 
   if (sourceZone === "shop") {
-    if (targetZone === "hand" || targetZone === "board") {
-      dragRuntime.actions.buyMinionToZone(sourceIndex, targetZone, targetIndex);
+    if (targetZone === "hand") {
+      dragRuntime.actions.buyMinion(sourceIndex);
     }
     return;
   }

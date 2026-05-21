@@ -26,6 +26,7 @@ function renderGame({
     elements.message.textContent = state.message;
   }
   syncLobbyPanel(state, elements);
+  renderDiscover(state, elements);
   elements.battleView.classList.toggle("hidden", isPrep);
 
   if (!skipZoneRenders && !(isPrep && dragState.status !== "idle")) {
@@ -86,12 +87,13 @@ function syncTimerDisplay(state, elements) {
 function syncButtons(state, elements) {
   const isPrep = state.phase === "prep";
   const isGameOver = state.hp <= 0 || state.phase === "gameOver";
+  const actionsLocked = Boolean(state.discover);
   const upgradeCost = UPGRADE_COSTS[state.tavernTier];
 
-  elements.refreshBtn.disabled = !isPrep || isGameOver || state.gold < REFRESH_COST;
-  elements.battleBtn.disabled = !isPrep || isGameOver;
-  elements.freezeBtn.disabled = !isPrep || isGameOver || !state.shop.length;
-  elements.upgradeBtn.disabled = !isPrep || isGameOver || upgradeCost === null || state.gold < upgradeCost;
+  elements.refreshBtn.disabled = !isPrep || isGameOver || actionsLocked || state.gold < REFRESH_COST;
+  elements.battleBtn.disabled = !isPrep || isGameOver || actionsLocked;
+  elements.freezeBtn.disabled = !isPrep || isGameOver || actionsLocked || !state.shop.length;
+  elements.upgradeBtn.disabled = !isPrep || isGameOver || actionsLocked || upgradeCost === null || state.gold < upgradeCost;
   elements.upgradeBtn.textContent = upgradeCost === null ? "商店已满级" : `升级商店（${upgradeCost} 金）`;
   elements.refreshBtn.textContent = `刷新（${REFRESH_COST} 金）`;
   elements.freezeBtn.textContent = state.shopFrozen ? "已冻结" : "冻结";
@@ -132,7 +134,7 @@ function renderHand(state, elements, bindPrepCardInteractions) {
 
   const actionsLocked = state.phase !== "prep" || state.hp <= 0;
   state.hand.forEach((minion, index) => {
-    const card = buildMinionCard(minion, { showActions: false });
+    const card = buildHandCard(minion, { showActions: false });
     bindPrepCardInteractions(card, "hand", index, actionsLocked);
     elements.hand.appendChild(card);
   });
@@ -173,6 +175,38 @@ function renderBattleBoards(state, elements) {
   renderBattleLane(elements.battlePlayer, playerSnapshot, "你的战队会在战斗阶段显示在这里。", state, elements);
 }
 
+function renderDiscover(state, elements) {
+  if (!elements.discoverView || !elements.discoverChoices) {
+    return;
+  }
+
+  const discover = state.discover;
+  elements.discoverView.classList.toggle("hidden", !discover);
+  elements.discoverChoices.innerHTML = "";
+
+  if (!discover) {
+    return;
+  }
+
+  if (elements.discoverTitle) {
+    elements.discoverTitle.textContent = "选择一张奖励随从";
+  }
+  if (elements.discoverSubtitle) {
+    elements.discoverSubtitle.textContent = `从四张 ${discover.rewardTier} 星随从中挑选一张加入手牌。`;
+  }
+
+  discover.choices.forEach((minion, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "discover-choice";
+    button.appendChild(buildMinionCard(minion, { showActions: false }));
+    button.addEventListener("click", () => {
+      window.__AUTO_CHESS_APP__?.chooseDiscoverReward?.(index);
+    });
+    elements.discoverChoices.appendChild(button);
+  });
+}
+
 function renderBattleLane(container, minions, emptyText, state, elements) {
   if (!container) {
     return;
@@ -189,7 +223,6 @@ function renderBattleLane(container, minions, emptyText, state, elements) {
     const card = buildMinionCard(minion, {
       battle: true,
       showActions: false,
-      slotLabel: `位置 ${index + 1}`,
       battleVisual: getBattleVisualState(state, minion, side),
     });
     container.appendChild(card);

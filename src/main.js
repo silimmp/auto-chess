@@ -28,6 +28,7 @@ function startGameApp() {
     actions: {
       buyMinion,
       buyMinionToZone,
+      chooseDiscoverReward,
       moveBoardMinion,
       moveHandMinion,
       playCardFromHand,
@@ -46,6 +47,7 @@ function startGameApp() {
   startPrepPhase();
 
   const app = {
+    chooseDiscoverReward,
     elements,
     prepZones,
     render,
@@ -72,6 +74,7 @@ function startGameApp() {
     startNextTurn,
     startPrepPhase,
     state,
+    chooseDiscoverReward,
     stopBattlePlayback,
     stopPostBattleReturn,
     stopPrepTimer,
@@ -161,6 +164,12 @@ function startGameApp() {
 
   function buyMinionToZone(shopIndex, targetZone = "hand", targetIndex = null) {
     if (buyMinionToZoneState(state, shopIndex, targetZone, targetIndex)) {
+      render();
+    }
+  }
+
+  function chooseDiscoverReward(choiceIndex) {
+    if (chooseDiscoverRewardState(state, choiceIndex)) {
       render();
     }
   }

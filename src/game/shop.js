@@ -10,6 +10,35 @@ function refreshShopState(state, generateShop) {
   return true;
 }
 
+function createTripleRewardCard(rewardTier) {
+  return {
+    cardKind: "tripleReward",
+    name: "三连奖励",
+    rewardTier,
+    text: `打出：从四张 ${rewardTier} 星随从中选择一张。`,
+  };
+}
+
+function createTripleRewardChoices(rewardTier, pickRandomFn = null, count = 4) {
+  const effectiveTier = Math.max(1, Math.min(CONTENT_TIER_CAP, rewardTier));
+  const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier === effectiveTier);
+  const fallback = MINION_POOL.filter((minion) => !minion.token && minion.tier <= effectiveTier);
+  const source = (candidates.length ? candidates : fallback).slice();
+  const choices = [];
+
+  while (source.length && choices.length < count) {
+    const picked = typeof pickRandomFn === "function" ? pickRandomFn(source) : source[0];
+    choices.push(createOwnedMinion(picked.id));
+    source.splice(source.findIndex((minion) => minion.id === picked.id), 1);
+  }
+
+  while (choices.length < count && choices.length > 0) {
+    choices.push(copyMinion(choices[choices.length % Math.max(1, choices.length)]));
+  }
+
+  return choices;
+}
+
 function toggleFreezeShopState(state) {
   if (state.phase !== "prep" || state.hp <= 0 || !state.shop.length) {
     return false;
@@ -37,14 +66,8 @@ function buyMinionToZoneState(state, shopIndex, targetZone = "hand", targetIndex
     state.message = "金币不够，先忍一手。";
     return true;
   }
-  if (targetZone === "board" && state.board.length >= BOARD_LIMIT) {
-    if (state.hand.length >= HAND_LIMIT) {
-      state.message = "战队和手牌都满了，先腾位置。";
-      return true;
-    }
-    targetZone = "hand";
-  }
-  if (state.hand.length >= HAND_LIMIT && targetZone !== "board") {
+  targetZone = "hand";
+  if (state.hand.length >= HAND_LIMIT) {
     state.message = "手牌已满，先处理一下手牌。";
     return true;
   }
@@ -52,17 +75,10 @@ function buyMinionToZoneState(state, shopIndex, targetZone = "hand", targetIndex
   state.gold -= BUY_COST;
   state.shop.splice(shopIndex, 1);
   const purchasedMinion = createOwnedMinion(shopMinion.id);
-  if (targetZone === "board") {
-    const insertIndex = normalizeInsertIndex(targetIndex, state.board.length);
-    state.board.splice(insertIndex, 0, purchasedMinion);
-  } else {
-    state.hand.push(purchasedMinion);
-  }
+  state.hand.push(purchasedMinion);
 
   const merged = resolveTriples(state);
-  const baseMessage =
-    targetZone === "board" ? `买下了 ${shopMinion.name}，已直接派上战场` : `买下了 ${shopMinion.name}，已置入手牌`;
-  state.message = buildRecruitMessage(baseMessage, merged);
+  state.message = buildRecruitMessage(`买下了 ${shopMinion.name}，已置入手牌`, merged);
   return true;
 }
 
