@@ -144,7 +144,11 @@ function startGameApp() {
     const frameRect = frame.getBoundingClientRect();
     const shellRect = shell.getBoundingClientRect();
     const prepRect = prepPanel.getBoundingClientRect();
+    const sharedZone = document.querySelector(".prep-shared-zone");
+    const sharedRect = sharedZone?.getBoundingClientRect() || null;
     const handRect = handZone.getBoundingClientRect();
+    const boardZone = document.querySelector(".prep-board-zone");
+    const boardRect = boardZone?.getBoundingClientRect() || null;
     const handBoardRect = handBoard.getBoundingClientRect();
     const handCardRect = handCard?.getBoundingClientRect() || null;
     const contentWidth = Math.max(
@@ -157,8 +161,14 @@ function startGameApp() {
     const contentHeight = Math.max(
       shellRect.height,
       prepRect.bottom - shellRect.top,
+      sharedRect ? sharedRect.bottom - shellRect.top : 0,
+      sharedRect ? sharedRect.top - shellRect.top : 0,
       handRect.bottom - shellRect.top,
+      handRect.top - shellRect.top,
+      boardRect ? boardRect.bottom - shellRect.top : 0,
+      boardRect ? boardRect.top - shellRect.top : 0,
       handBoardRect.bottom - shellRect.top,
+      handBoardRect.top - shellRect.top,
       handCardRect ? handCardRect.bottom - shellRect.top : 0
     );
     const widthScale = frameRect.width / Math.max(1, contentWidth);

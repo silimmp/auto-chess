@@ -310,6 +310,35 @@ async function collectViewportFitMetrics(page) {
   });
 }
 
+async function collectHudAndToolbarMetrics(page) {
+  return page.evaluate(() => {
+    const lobbyPanel = document.querySelector(".lobby-panel");
+    const lobbyRoster = document.querySelector("#lobby-roster");
+    const lobbyListBlock = document.querySelector(".lobby-list-block");
+    const shopTitle = document.querySelector(".shop-title");
+    const odds = document.querySelector(".shop-odds-inline");
+    if (!lobbyPanel || !lobbyRoster || !lobbyListBlock || !shopTitle || !odds) {
+      return null;
+    }
+
+    const lobbyPanelRect = lobbyPanel.getBoundingClientRect();
+    const lobbyRosterRect = lobbyRoster.getBoundingClientRect();
+    const lobbyListRect = lobbyListBlock.getBoundingClientRect();
+    const shopTitleRect = shopTitle.getBoundingClientRect();
+    const oddsRect = odds.getBoundingClientRect();
+    return {
+      lobbyListVisibleHeight: Math.round(lobbyListRect.height),
+      lobbyRosterBottomOverflow: Math.round(lobbyRosterRect.bottom - lobbyPanelRect.bottom),
+      lobbyRosterCount: document.querySelectorAll("#lobby-roster .lobby-chip").length,
+      lobbyRosterTopGap: Math.round(lobbyRosterRect.top - lobbyListRect.top),
+      oddsLeftOffsetFromTitle: Math.round(oddsRect.left - shopTitleRect.left),
+      oddsOffsetFromTitleTop: Math.round(oddsRect.top - shopTitleRect.top),
+      oddsRightOfTitleBox: Math.round(oddsRect.left - shopTitleRect.left),
+      oddsRowDelta: Math.round((oddsRect.top + oddsRect.bottom) / 2 - (shopTitleRect.top + shopTitleRect.bottom) / 2),
+    };
+  });
+}
+
 async function runScenario(name, browser, url, handler) {
   const { page, consoleErrors, pageErrors } = await openPage(browser, url);
   try {
@@ -513,7 +542,9 @@ async function main() {
     results.push(
       await runScenarioWithViewport("desktop-scale-fit", browser, url, { width: 1366, height: 768 }, async (page) => {
         const initial = await collectViewportFitMetrics(page);
+        const detail = await collectHudAndToolbarMetrics(page);
         assert(initial, "桌面缩放适配缺少关键节点。");
+        assert(detail, "桌面缩放适配缺少 HUD 或工具条关键节点。");
         assert(initial.frameBottomOverflow <= 0, "桌面缩放时外层框不应超出视口底部。");
         assert(initial.frameRightOverflow <= 0, "桌面缩放时外层框不应超出视口右侧。");
         assert(initial.shellBottomOverflow <= 0, "桌面缩放时主舞台不应超出视口底部。");
@@ -521,7 +552,12 @@ async function main() {
         assert(initial.panelBottomOverflow <= 0, "桌面缩放时准备阶段主框不应被裁切。");
         assert(initial.trayBottomOverflow <= 0, "桌面缩放时手牌区不应被裁切。");
         assert(initial.scale > 0.1 && initial.scale <= 1, "桌面缩放比例应落在有效范围内。");
-        return initial;
+        assert(detail.lobbyRosterCount > 0, "桌面缩放时大厅存活名单不应消失。");
+        assert(detail.lobbyListVisibleHeight >= 56, "桌面缩放时大厅名单区可见高度不足。");
+        assert(detail.lobbyRosterBottomOverflow <= 0, "桌面缩放时大厅名单不应溢出到底板外。");
+        assert(detail.oddsRightOfTitleBox >= 70, "桌面缩放时概率条应位于随从商店标题右侧。");
+        assert(Math.abs(detail.oddsRowDelta) <= 40, "桌面缩放时概率条应与随从商店标题保持同一行。");
+        return { detail, initial };
       })
     );
 
