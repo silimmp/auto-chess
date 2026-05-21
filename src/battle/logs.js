@@ -17,6 +17,7 @@ function createBattleFrame(player, enemy, options = {}) {
     defenderSide: options.defenderSide ?? "",
     hitIds: options.hitIds ? [...options.hitIds] : [],
     defeatedIds: options.defeatedIds ? [...options.defeatedIds] : [],
+    cues: options.cues ? options.cues.map((cue) => ({ ...cue })) : [],
     log: options.log ?? "",
     progress: options.progress ?? "战斗中",
     delay: options.delay ?? BATTLE_ACTION_DELAY_MS,

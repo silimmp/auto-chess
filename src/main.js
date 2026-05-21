@@ -421,6 +421,7 @@ function startGameApp() {
       defenderSide: "",
       hitIds: [],
       defeatedIds: [],
+      cues: [],
       progressLabel: "战斗开始",
       logLines: [],
     };
@@ -480,6 +481,7 @@ function startGameApp() {
       state.battleAnimation.defenderSide = frame.defenderSide;
       state.battleAnimation.hitIds = [...frame.hitIds];
       state.battleAnimation.defeatedIds = [...frame.defeatedIds];
+      state.battleAnimation.cues = frame.cues ? frame.cues.map((cue) => ({ ...cue })) : [];
       state.battleAnimation.progressLabel = frame.progress;
       if (frame.log) {
         state.battleAnimation.logLines = [...state.battleAnimation.logLines, frame.log];
@@ -505,6 +507,7 @@ function startGameApp() {
       defenderSide: "",
       hitIds: [],
       defeatedIds: [],
+      cues: [],
       progressLabel: result.summary,
     };
     state.lastBattle = {

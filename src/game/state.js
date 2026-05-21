@@ -20,6 +20,13 @@ function createElements() {
     battleView: document.querySelector("#battle-view"),
     battleEnemy: document.querySelector("#battle-enemy-board"),
     battlePlayer: document.querySelector("#battle-player-board"),
+    battleEnemyName: document.querySelector("#battle-enemy-name"),
+    battleEnemyCount: document.querySelector("#battle-enemy-count"),
+    battlePlayerName: document.querySelector("#battle-player-name"),
+    battlePlayerCount: document.querySelector("#battle-player-count"),
+    battleTurnPill: document.querySelector("#battle-turn-pill"),
+    battleProgressLabel: document.querySelector("#battle-progress-label"),
+    battleSummaryText: document.querySelector("#battle-summary-text"),
     lobbyAlive: document.querySelector("#lobby-alive-value"),
     lobbyPlace: document.querySelector("#lobby-place-value"),
     lobbyOpponent: document.querySelector("#lobby-opponent-value"),
@@ -35,6 +42,7 @@ function createElements() {
 
 function createPrepZones(elements) {
   return {
+    shared: elements.shop?.closest(".prep-shared-zone") || null,
     shop: elements.shop?.closest(".prep-shop-zone") || null,
     hand: elements.hand?.closest(".prep-hand-zone") || null,
     board: elements.board?.closest(".prep-board-zone") || null,
@@ -94,6 +102,7 @@ function createBattleAnimationState() {
     defenderSide: "",
     hitIds: [],
     defeatedIds: [],
+    cues: [],
     progressLabel: "等待开战",
     logLines: [],
   };

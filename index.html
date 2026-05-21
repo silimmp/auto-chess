@@ -73,7 +73,7 @@
 
       <main id="prep-view" class="game-stage">
         <section class="panel prep-panel">
-          <div class="prep-zone prep-shop-zone">
+          <div class="prep-zone prep-shared-zone">
             <div class="shop-toolbar">
               <div class="shop-title">
                 <h1 aria-label="随从商店">
@@ -95,17 +95,20 @@
                 <button id="freeze-btn" class="action-btn ghost">冻结</button>
               </div>
             </div>
-            <div id="shop-board" class="card-row shop-row"></div>
-          </div>
 
-          <div class="prep-zone prep-battle-stack">
-            <div class="prep-board-zone">
-              <div id="player-board" class="card-row board-row"></div>
-            </div>
+            <div class="prep-shared-body prep-battle-stack">
+              <div class="prep-shop-zone">
+                <div id="shop-board" class="card-row shop-row"></div>
+              </div>
 
-            <div class="prep-hand-zone">
-              <div class="hand-tray-hotspot" aria-hidden="true"></div>
-              <div id="hand-board" class="card-row hand-row"></div>
+              <div class="prep-board-zone">
+                <div id="player-board" class="card-row board-row"></div>
+              </div>
+
+              <div class="prep-hand-zone">
+                <div class="hand-tray-hotspot" aria-hidden="true"></div>
+                <div id="hand-board" class="card-row hand-row"></div>
+              </div>
             </div>
           </div>
         </section>
@@ -122,6 +125,23 @@
 
       <section id="battle-view" class="battle-overlay hidden">
         <div class="battle-overlay-panel">
+          <div class="battle-topbar">
+            <div class="battle-topbar-side enemy">
+              <div class="battle-topbar-label">对手战队</div>
+              <div id="battle-enemy-name" class="battle-topbar-name">神秘对手</div>
+              <div id="battle-enemy-count" class="battle-topbar-meta">剩余 0 名随从</div>
+            </div>
+            <div class="battle-topbar-center">
+              <div id="battle-turn-pill" class="battle-turn-pill">第 1 回合</div>
+              <div id="battle-progress-label" class="battle-progress-label">等待开战</div>
+              <div id="battle-summary-text" class="battle-summary-text">战斗即将开始。</div>
+            </div>
+            <div class="battle-topbar-side player">
+              <div class="battle-topbar-label">你的战队</div>
+              <div id="battle-player-name" class="battle-topbar-name">你</div>
+              <div id="battle-player-count" class="battle-topbar-meta">剩余 0 名随从</div>
+            </div>
+          </div>
           <div class="battle-stage battle-stage-full">
             <div class="battle-arena battle-arena-full">
               <div class="battle-side">

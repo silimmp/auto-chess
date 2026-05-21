@@ -83,6 +83,7 @@ function performAttackSequence(player, enemy, logs, frames, attackerSide, attack
       pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(attackerSide)} ${attacker.name} 发动连击，再次发起攻击。`, {
         attackerId: attacker.instanceId,
         attackerSide,
+        cues: [{ targetId: attacker.instanceId, type: "keyword", label: "连击" }],
         progress,
         delay: BATTLE_ACTION_DELAY_MS,
       });
@@ -99,7 +100,7 @@ function performSingleAttack(player, enemy, logs, frames, attackerSide, attacker
   const defenders = attackerSide === "player" ? enemy : player;
   const defenderIndex = chooseTargetIndex(defenders);
   const defender = defenders[defenderIndex];
-  const splashTargets = getAttackSplashTargets(defenders, defenderIndex, attacker);
+  const extraHits = getAttackExtraHits(defenders, defenderIndex, attacker);
   const defenderSide = attackerSide === "player" ? "enemy" : "player";
   const attackMessage = `${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。`;
   const battleContext = { player, enemy, logs, frames };
@@ -134,7 +135,7 @@ function performSingleAttack(player, enemy, logs, frames, attackerSide, attacker
     defenderId: defender.instanceId,
     attackerSide,
     defenderSide,
-    hitIds: [attacker.instanceId, defender.instanceId, ...splashTargets.map((target) => target.instanceId)],
+    hitIds: [attacker.instanceId, defender.instanceId, ...extraHits.map((entry) => entry.target.instanceId)],
     progress,
     delay: BATTLE_HIT_DELAY_MS,
   });
@@ -142,30 +143,35 @@ function performSingleAttack(player, enemy, logs, frames, attackerSide, attacker
   recordPostDamageEffects(attackerDamageNote, attacker, player, enemy, logs, frames, attackerDamageOptions);
   recordPostDamageEffects(defenderDamageNote, defender, player, enemy, logs, frames, defenderDamageOptions);
 
-  if (splashTargets.length) {
-    const splashLabel = attacker.keywords.includes("sweep") ? "横扫" : "顺劈";
-    const splashNames = splashTargets.map((target) => target.name).join("、");
-    pushBattleLogFrame(player, enemy, logs, frames, `${attacker.name} 的${splashLabel}波及了 ${splashNames}。`, {
+  if (extraHits.length) {
+    const extraLabel = extraHits[0].label;
+    const extraNames = extraHits.map((entry) => entry.target.name).join("、");
+    const extraLog =
+      extraLabel === "溅射"
+        ? `${attacker.name} 的溅射波及了 ${extraNames}，各造成 1 点伤害。`
+        : `${attacker.name} 的${extraLabel}波及了 ${extraNames}。`;
+    pushBattleLogFrame(player, enemy, logs, frames, extraLog, {
       attackerId: attacker.instanceId,
-      defenderId: splashTargets[0].instanceId,
+      defenderId: extraHits[0].target.instanceId,
       attackerSide,
       defenderSide,
-      hitIds: splashTargets.map((target) => target.instanceId),
+      hitIds: extraHits.map((entry) => entry.target.instanceId),
       progress,
       delay: BATTLE_HIT_DELAY_MS,
     });
 
-    splashTargets.forEach((target) => {
-      const splashNote = applyDamage(target, attacker.attack, attacker, battleContext, {
+    extraHits.forEach((entry) => {
+      const splashNote = applyDamage(entry.target, entry.damage, attacker, battleContext, {
         attackerId: attacker.instanceId,
-        defenderId: target.instanceId,
+        defenderId: entry.target.instanceId,
         attackerSide,
         defenderSide,
+        allowPoisonous: entry.allowPoisonous,
         progress,
       });
-      recordPostDamageEffects(splashNote, target, player, enemy, logs, frames, {
+      recordPostDamageEffects(splashNote, entry.target, player, enemy, logs, frames, {
         attackerId: attacker.instanceId,
-        defenderId: target.instanceId,
+        defenderId: entry.target.instanceId,
         attackerSide,
         defenderSide,
         progress,
@@ -231,7 +237,7 @@ function applyDamage(target, amount, source = null, battleContext = null, option
     return "shield";
   }
 
-  if (source && source.keywords.includes("poisonous")) {
+  if (options.allowPoisonous !== false && source && source.keywords.includes("poisonous")) {
     target.health = 0;
     return "poisoned";
   }
@@ -240,25 +246,44 @@ function applyDamage(target, amount, source = null, battleContext = null, option
   return "damaged";
 }
 
-function getAttackSplashTargets(board, defenderIndex, attacker) {
-  const targetIds = new Set();
-
-  if (attacker.keywords.includes("cleave")) {
-    const cleaveTarget = board[defenderIndex + 1];
-    if (cleaveTarget && cleaveTarget.health > 0) {
-      targetIds.add(cleaveTarget.instanceId);
-    }
-  }
+function getAttackExtraHits(board, defenderIndex, attacker) {
+  const adjacentTargets = [board[defenderIndex - 1], board[defenderIndex + 1]].filter(
+    (target) => target && target.health > 0
+  );
 
   if (attacker.keywords.includes("sweep")) {
-    [board[defenderIndex - 1], board[defenderIndex + 1]].forEach((target) => {
-      if (target && target.health > 0) {
-        targetIds.add(target.instanceId);
-      }
-    });
+    return adjacentTargets.map((target) => ({
+      target,
+      label: "横扫",
+      damage: attacker.attack,
+      allowPoisonous: true,
+    }));
   }
 
-  return board.filter((minion) => targetIds.has(minion.instanceId));
+  if (attacker.keywords.includes("cleave")) {
+    const chosen = adjacentTargets.length ? pickRandom(adjacentTargets) : null;
+    return chosen
+      ? [
+          {
+            target: chosen,
+            label: "顺劈",
+            damage: attacker.attack,
+            allowPoisonous: true,
+          },
+        ]
+      : [];
+  }
+
+  if (attacker.keywords.includes("splash")) {
+    return adjacentTargets.map((target) => ({
+      target,
+      label: "溅射",
+      damage: 1,
+      allowPoisonous: false,
+    }));
+  }
+
+  return [];
 }
 
 function cleanupBattlefield(player, enemy, logs, frames, progress) {
@@ -304,6 +329,7 @@ function tryResolveReborn(board, index, minion, player, enemy, side, logs, frame
   pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(side)} ${minion.name} 触发复生，再次回到了战场。`, {
     defeatedIds: [],
     hitIds: [minion.instanceId],
+    cues: [{ targetId: minion.instanceId, type: "keyword", label: "复生" }],
     progress,
     delay: BATTLE_CLEANUP_DELAY_MS,
   });
@@ -332,6 +358,7 @@ function recordShieldBreak(note, target, player, enemy, logs, frames, options = 
   pushBattleLogFrame(player, enemy, logs, frames, `${target.name} 的圣盾被打掉了。`, {
     ...options,
     hitIds: [target.instanceId],
+    cues: [{ targetId: target.instanceId, type: "keyword", label: "圣盾破裂" }],
     delay: BATTLE_HIT_DELAY_MS,
   });
 }
@@ -390,6 +417,7 @@ function resolvePendingAssaults(player, enemy, logs, frames, preferredSide, prog
     pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(next.side)} ${next.minion.name} 触发狂袭，立即发起攻击。`, {
       attackerId: next.minion.instanceId,
       attackerSide: next.side,
+      cues: [{ targetId: next.minion.instanceId, type: "keyword", label: "狂袭" }],
       progress,
       delay: BATTLE_ACTION_DELAY_MS,
     });

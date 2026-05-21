@@ -65,6 +65,7 @@ function resolveSummonDeathrattle(board, opposingBoard, index, minion, player, e
 
   if (summons.length) {
     pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(side)} ${minion.name} 的亡语生效，召唤了 ${summons.length} 个单位。`, {
+      cues: [{ targetId: minion.instanceId, type: "keyword", label: "亡语" }],
       progress,
       delay: BATTLE_CLEANUP_DELAY_MS,
     });
@@ -96,6 +97,7 @@ function resolveBuffFriendlyTribeDeathrattle(board, opposingBoard, index, minion
       `${getSideLabel(side)} ${minion.name} 的亡语鼓舞了 ${friendlies.length} 个友军，赋予 +${attack}/+${health}。`,
       {
         hitIds: friendlies.map((friendly) => friendly.instanceId),
+        cues: [{ targetId: minion.instanceId, type: "keyword", label: "亡语" }],
         progress,
         delay: BATTLE_CLEANUP_DELAY_MS,
       }
@@ -132,6 +134,7 @@ function resolveDealRandomDamageDeathrattle(board, opposingBoard, index, minion,
       defenderId: target.instanceId,
       attackerSide,
       defenderSide,
+      cues: [{ targetId: minion.instanceId, type: "keyword", label: "亡语" }],
       progress,
       delay: BATTLE_ACTION_DELAY_MS,
     });

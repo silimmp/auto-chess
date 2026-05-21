@@ -40,6 +40,7 @@ function renderGame({
   if (!skipZoneRenders) {
     renderBattleBoards(state, elements);
   }
+  syncBattleOverlay(state, elements);
   syncButtons(state, elements);
 }
 
@@ -50,6 +51,9 @@ function syncTouchSelectionState(state, touchSelection, elements) {
     touchSelection.sourceZone === "hand" &&
     touchSelection.index >= 0;
   document.body.classList.toggle("touch-selection-active", selectionActive);
+  const sharedZone = elements.shop?.closest(".prep-shared-zone");
+  sharedZone?.classList.toggle("touch-target-ready", selectionActive);
+  sharedZone?.classList.toggle("touch-selection-ready", selectionActive);
   elements.board?.closest(".prep-board-zone")?.classList.toggle("touch-target-ready", selectionActive);
   elements.hand?.closest(".prep-hand-zone")?.classList.toggle("touch-selection-ready", selectionActive);
 }
@@ -191,6 +195,64 @@ function renderBattleBoards(state, elements) {
   renderBattleLane(elements.battlePlayer, playerSnapshot, "你的战队会在战斗阶段显示在这里。", state, elements);
 }
 
+function syncBattleOverlay(state, elements) {
+  if (elements.battleView) {
+    elements.battleView.dataset.focusSide = getBattleFocusSide(state);
+    elements.battleView.dataset.battleState = getBattleOverlayState(state);
+  }
+
+  if (elements.battleTurnPill) {
+    elements.battleTurnPill.textContent = `第 ${state.turn} 回合`;
+  }
+
+  if (elements.battleEnemyName) {
+    elements.battleEnemyName.textContent = state.currentOpponentName || LOBBY_GHOST_LABEL;
+  }
+  if (elements.battlePlayerName) {
+    elements.battlePlayerName.textContent = "你";
+  }
+
+  const usingAnimation = state.phase === "battle" && state.battleAnimation.active;
+  const playerSnapshot =
+    state.phase === "prep"
+      ? state.board
+      : usingAnimation
+        ? state.battleAnimation.playerBoard
+        : state.lastBattle.playerSnapshot;
+  const enemySnapshot =
+    state.phase === "prep"
+      ? state.enemyBoard
+      : usingAnimation
+        ? state.battleAnimation.enemyBoard
+        : state.lastBattle.enemySnapshot;
+
+  if (elements.battlePlayerCount) {
+    elements.battlePlayerCount.textContent = `剩余 ${countLivingMinions(playerSnapshot)} 名随从`;
+  }
+  if (elements.battleEnemyCount) {
+    elements.battleEnemyCount.textContent = `剩余 ${countLivingMinions(enemySnapshot)} 名随从`;
+  }
+
+  const progress = usingAnimation
+    ? state.battleAnimation.progressLabel
+    : state.phase === "battle"
+      ? state.lastBattle.summary || "战斗结束"
+      : "等待开战";
+  const summary = usingAnimation
+    ? getLatestBattleLogLine(state.battleAnimation.logLines) || state.message
+    : state.phase === "battle"
+      ? state.lastBattle.summary || state.message
+      : "战斗即将开始。";
+
+  if (elements.battleProgressLabel) {
+    elements.battleProgressLabel.textContent = progress;
+  }
+  if (elements.battleSummaryText) {
+    elements.battleSummaryText.textContent = summary;
+  }
+
+}
+
 function renderDiscover(state, elements) {
   if (!elements.discoverView || !elements.discoverChoices) {
     return;
@@ -245,28 +307,83 @@ function renderBattleLane(container, minions, emptyText, state, elements) {
     const card = buildMinionCard(minion, {
       battle: true,
       showActions: false,
-      battleVisual: getBattleVisualState(state, minion, side),
+      battleVisual: getBattleVisualState(state, minion, side, index),
     });
     container.appendChild(card);
   });
 }
 
-function getBattleVisualState(state, minion, side) {
+function getBattleVisualState(state, minion, side, slotIndex) {
   const animation = state.battleAnimation;
   if (state.phase !== "battle" || !animation.active) {
-    return null;
+    return {
+      slotIndex,
+      isAttacker: false,
+      isDefender: false,
+      takingHit: false,
+      defeated: minion.health <= 0,
+      chargeClass: "",
+      trailClass: "",
+      impactClass: "",
+      roleLabel: "",
+      roleClass: "",
+    };
   }
 
   const isAttacker = animation.attackerId === minion.instanceId && animation.attackerSide === side;
   const isDefender = animation.defenderId === minion.instanceId && animation.defenderSide === side;
+  const cue = animation.cues.find((entry) => entry.targetId === minion.instanceId) || null;
+  const wasDefeated = animation.defeatedIds.includes(minion.instanceId);
 
   return {
+    slotIndex,
     isAttacker,
     isDefender,
     takingHit: animation.hitIds.includes(minion.instanceId),
-    defeated: animation.defeatedIds.includes(minion.instanceId),
+    defeated: wasDefeated,
     chargeClass: isAttacker ? (side === "player" ? "charge-player" : "charge-enemy") : "",
+    trailClass: isAttacker ? (side === "player" ? "trail-player" : "trail-enemy") : "",
+    impactClass: animation.hitIds.includes(minion.instanceId) ? (side === "player" ? "impact-player" : "impact-enemy") : "",
+    vanishClass: wasDefeated ? "vanishing" : "",
+    reviveClass: cue?.label === "复生" ? "reviving" : "",
+    cueLabel: cue?.label || "",
+    cueTone: getBattleCueTone(cue?.label),
     roleLabel: isAttacker ? "进攻" : isDefender ? "受击" : "",
     roleClass: isAttacker ? "attacker" : isDefender ? "defender" : "",
   };
+}
+
+function countLivingMinions(minions) {
+  return minions.filter((minion) => minion.health > 0).length;
+}
+
+function getLatestBattleLogLine(lines) {
+  return lines.length ? lines[lines.length - 1] : "";
+}
+
+function getBattleFocusSide(state) {
+  if (state.phase !== "battle" || !state.battleAnimation.active) {
+    return "neutral";
+  }
+  return state.battleAnimation.attackerSide || "neutral";
+}
+
+function getBattleOverlayState(state) {
+  if (state.phase !== "battle") {
+    return "idle";
+  }
+  return state.battleAnimation.isAnimating ? "animating" : "resolved";
+}
+
+function getBattleCueTone(label) {
+  if (label === "亡语" || label === "复生") {
+    return "necromancy";
+  }
+  if (label === "圣盾破裂") {
+    return "shield";
+  }
+  if (label === "狂袭" || label === "连击") {
+    return "attack";
+  }
+  return "neutral";
 }

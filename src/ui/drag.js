@@ -200,6 +200,9 @@ function updateDropTargetState(clientX, clientY) {
   dragRuntime.dragState.currentSlotLabel = zone === "board" && index >= 0 ? `将放在第 ${index + 1} 位` : "";
 
   Object.entries(dragRuntime.prepZones).forEach(([key, element]) => {
+    if (key === "shared") {
+      return;
+    }
     element?.classList.toggle("drop-target", key === zone);
     if (key === "board") {
       if (zone === "board" && index >= 0) {
@@ -211,6 +214,7 @@ function updateDropTargetState(clientX, clientY) {
       }
     }
   });
+  dragRuntime.prepZones.shared?.classList.toggle("drop-target", zone === "hand" || zone === "board");
   dragRuntime.elements.prepPanel?.classList.toggle("sell-armed", zone === "sell");
 }
 
@@ -336,7 +340,9 @@ function isValidDropZone(sourceZone, targetZone) {
 }
 
 function getDropZoneAtPoint(clientX, clientY) {
-  for (const [zone, element] of Object.entries(dragRuntime.prepZones)) {
+  const orderedZones = ["shop", "board", "hand", "shared"];
+  for (const zone of orderedZones) {
+    const element = dragRuntime.prepZones[zone];
     if (!element) {
       continue;
     }
@@ -356,9 +362,11 @@ function getDropIndex(zone, clientX) {
   }
 
   const cards = [...container.querySelectorAll(".minion-card:not(.drag-source)")];
+  const dragRect = getActiveDragRect();
+  const probeX = dragRect ? dragRect.left + dragRect.width / 2 : clientX;
   for (let index = 0; index < cards.length; index += 1) {
     const rect = cards[index].getBoundingClientRect();
-    if (clientX < rect.left + rect.width / 2) {
+    if (probeX < rect.left + rect.width / 2) {
       return index;
     }
   }
@@ -433,6 +441,10 @@ function cleanupDragState() {
   dragRuntime.dragState.sourceElement?.classList.remove("drag-source");
   dragRuntime.dragState.previewElement?.remove();
   Object.entries(dragRuntime.prepZones).forEach(([key, element]) => {
+    if (key === "shared") {
+      element?.classList.remove("drop-target");
+      return;
+    }
     element?.classList.remove("drop-target");
     if (key === "board") {
       element?.style.removeProperty("--drop-slot-index");

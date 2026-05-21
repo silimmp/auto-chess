@@ -7,7 +7,11 @@ function buildMinionCard(minion, options = {}) {
         battleVisual.isAttacker ? "attacking" : "",
         battleVisual.isDefender ? "defending" : "",
         battleVisual.chargeClass,
+        battleVisual.trailClass,
         battleVisual.takingHit ? "taking-hit" : "",
+        battleVisual.impactClass,
+        battleVisual.vanishClass,
+        battleVisual.reviveClass,
         battleVisual.defeated ? "defeated" : "",
       ]
         .filter(Boolean)
@@ -29,6 +33,8 @@ function buildMinionCard(minion, options = {}) {
               ? "keyword shield"
               : keyword === "cleave"
                 ? "keyword taunt"
+                : keyword === "splash"
+                  ? "keyword shield"
                 : keyword === "sweep" || keyword === "combo" || keyword === "assault"
                   ? "keyword taunt"
                   : keyword === "barrier"
@@ -41,10 +47,12 @@ function buildMinionCard(minion, options = {}) {
   const battleTop = battle
     ? `
       <div class="battle-card-top">
+        ${typeof battleVisual?.slotIndex === "number" ? `<span class="battle-slot">站位 ${battleVisual.slotIndex + 1}</span>` : ""}
         ${battleVisual?.roleLabel ? `<span class="battle-role ${battleVisual.roleClass}">${battleVisual.roleLabel}</span>` : ""}
       </div>
     `
     : "";
+  const battleCue = battleVisual?.cueLabel ? `<div class="battle-float-cue ${battleVisual.cueTone}">${battleVisual.cueLabel}</div>` : "";
 
   const infoToggle = !battle ? '<button type="button" class="card-info-toggle" aria-label="查看描述">i</button>' : "";
   const descriptionBlock = battle ? `<p class="minion-text">${minion.text || "没有额外效果。"}</p>` : "";
@@ -59,6 +67,7 @@ function buildMinionCard(minion, options = {}) {
     : "";
 
   card.innerHTML = `
+    ${battleCue}
     <div class="minion-main">
       ${battleTop}
       <div class="minion-header">
@@ -147,6 +156,9 @@ function getKeywordLabel(keyword) {
   }
   if (keyword === "cleave") {
     return "顺劈";
+  }
+  if (keyword === "splash") {
+    return "溅射";
   }
   if (keyword === "sweep") {
     return "横扫";
