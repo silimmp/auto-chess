@@ -22,6 +22,8 @@
   --shadow-soft: 0 12px 24px rgba(0, 0, 0, 0.16);
   --card-width: 118px;
   --hud-width: 220px;
+  --countdown-width: 148px;
+  --countdown-safe-gap: 176px;
   --shell-gap: 16px;
   --shell-padding: 16px;
 }
@@ -418,6 +420,36 @@ body::after {
   transform: translateY(-1px);
 }
 
+.prep-board-zone.touch-target-ready {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 211, 118, 0.22), transparent 42%),
+    linear-gradient(180deg, rgba(255, 241, 207, 0.5), rgba(255, 252, 240, 0.26));
+  box-shadow:
+    inset 0 0 0 1px rgba(180, 122, 37, 0.22),
+    0 12px 20px rgba(145, 95, 33, 0.08);
+}
+
+.prep-board-zone.touch-target-ready::after {
+  content: "点战场快速上场";
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(120, 73, 26, 0.86);
+  color: #fff7ea;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  box-shadow: 0 8px 16px rgba(76, 44, 15, 0.14);
+}
+
+.prep-hand-zone.touch-selection-ready::after {
+  color: rgba(84, 61, 55, 0.82);
+}
+
 .prep-shop-zone {
   position: relative;
   grid-template-rows: auto minmax(0, 1fr);
@@ -454,6 +486,13 @@ body::after {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
+}
+
+.prep-board-zone::before,
+.prep-board-zone::after {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .prep-hand-zone {
@@ -493,9 +532,10 @@ body::after {
 }
 
 .shop-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 14px;
   margin-bottom: 0;
   min-height: 72px;
@@ -511,8 +551,10 @@ body::after {
   flex: 1;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   min-width: 0;
+  padding-right: var(--countdown-safe-gap);
 }
 
 .shop-title h1,
@@ -551,9 +593,11 @@ body::after {
 .shop-odds-inline {
   display: flex;
   align-items: center;
+  flex: 0 1 360px;
   gap: 8px;
   min-width: 0;
-  margin: 0;
+  max-width: 360px;
+  margin: 4px 0 0;
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid rgba(122, 78, 35, 0.14);
@@ -574,7 +618,7 @@ body::after {
   color: var(--ink);
   font-size: 12px;
   line-height: 1.2;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .panel h2 {
@@ -595,10 +639,10 @@ body::after {
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(100%, 148px);
+  width: var(--countdown-width);
   padding: 8px 10px 9px;
   text-align: center;
-  z-index: 1;
+  z-index: 2;
 }
 
 .compact-countdown .panel-kicker {
@@ -701,6 +745,13 @@ body::after {
   overflow: visible;
   padding: 2px 0 8px;
   scrollbar-width: none;
+}
+
+.shop-row::-webkit-scrollbar,
+.hand-row::-webkit-scrollbar,
+.board-row::-webkit-scrollbar,
+.battle-board::-webkit-scrollbar {
+  display: none;
 }
 
 .hand-row {
@@ -1065,6 +1116,22 @@ body::after {
 .minion-card.drag-source {
   opacity: 0.16;
   filter: saturate(0.7);
+}
+
+.minion-card.touch-press-armed {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 18px 30px rgba(74, 44, 13, 0.24),
+    0 0 0 2px rgba(214, 158, 64, 0.28);
+}
+
+.minion-card.touch-selected {
+  transform: translateY(-8px) scale(1.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 20px 32px rgba(74, 44, 13, 0.24),
+    0 0 0 3px rgba(219, 167, 65, 0.34);
 }
 
 .drag-preview {
@@ -1923,6 +1990,11 @@ body::after {
 }
 
 @media (max-width: 760px) {
+  :root {
+    --shell-padding: 10px;
+    --card-width: 108px;
+  }
+
   .game-shell {
     width: min(100vw - 12px, 1480px);
     margin: 6px auto;
@@ -1930,8 +2002,9 @@ body::after {
     border-radius: 20px;
   }
 
-  :root {
-    --shell-padding: 10px;
+  .hud-column {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .hud-column,
@@ -1939,9 +2012,23 @@ body::after {
     gap: 10px;
   }
 
+  .hud-panel,
+  .panel {
+    border-radius: 18px;
+  }
+
+  .hud-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hud-actions .action-btn:first-child {
+    grid-column: 1 / -1;
+  }
+
   .prep-panel {
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto;
     gap: 14px;
+    padding: 14px 12px 10px;
   }
 
   .panel-head,
@@ -1954,45 +2041,383 @@ body::after {
     flex-direction: column;
     min-height: 0;
     gap: 10px;
+    padding-bottom: 2px;
   }
 
   .shop-title {
-    justify-self: center;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
+    justify-self: stretch;
+    justify-content: flex-start;
+    align-items: flex-start;
+    text-align: left;
     flex-wrap: wrap;
     gap: 8px;
   }
 
+  .shop-title h1 {
+    min-width: auto;
+    padding: 7px 10px 8px;
+    font-size: 16px;
+  }
+
   .shop-odds-inline {
-    justify-content: center;
+    justify-content: flex-start;
     width: 100%;
+    flex-wrap: wrap;
+    border-radius: 14px;
   }
 
   .compact-countdown {
     position: static;
     justify-self: center;
-    width: min(100%, 180px);
+    width: min(100%, 220px);
     transform: none;
   }
 
   .top-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     justify-self: stretch;
-    justify-content: stretch;
+    width: 100%;
+    align-self: stretch;
   }
 
   .top-actions .action-btn {
-    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
   }
 
-  .shop-title h1 {
-    min-width: 64px;
+  #upgrade-btn {
+    grid-column: 1 / -1;
+  }
+
+  .prep-zone {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .prep-battle-stack {
+    grid-template-rows: auto auto;
+    gap: 10px;
+    padding: 8px 0 0;
+    border-radius: 24px;
+  }
+
+  .prep-battle-stack .prep-board-zone,
+  .prep-battle-stack .prep-hand-zone {
+    padding-inline: 0;
+  }
+
+  .prep-battle-stack .prep-board-zone {
+    padding-bottom: 8px;
+  }
+
+  .prep-battle-stack .prep-hand-zone {
+    padding-bottom: 10px;
+  }
+
+  .shop-row,
+  .board-row,
+  .battle-board {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 4px 2px 12px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .shop-row .minion-card,
+  .board-row .minion-card {
+    flex: 0 0 var(--card-width);
+    scroll-snap-align: start;
+  }
+
+  .battle-board .minion-card {
+    flex: 0 0 118px;
+    scroll-snap-align: start;
+  }
+
+  .hand-row {
+    min-height: 156px;
+    padding: 6px 4px 14px;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    transform: none;
+  }
+
+  .hand-row .minion-card {
+    flex: 0 0 104px;
+    width: 104px;
+    min-height: 162px;
+    margin-left: 0;
+    --fan-lift: 0px;
+    --fan-offset: 0px;
+    --fan-rotate: 0deg;
+    transform: translateX(0) translateY(0) rotate(0deg) scale(1);
+    scroll-snap-align: start;
+  }
+
+  .prep-hand-zone:hover .hand-row,
+  .prep-hand-zone.drop-target .hand-row,
+  .prep-hand-zone:focus-within .hand-row,
+  .hand-row:focus-within {
+    transform: none;
+  }
+
+  .prep-hand-zone:hover .hand-row .minion-card,
+  .prep-hand-zone.drop-target .hand-row .minion-card,
+  .prep-hand-zone:focus-within .hand-row .minion-card,
+  .hand-row:focus-within .minion-card {
+    margin-left: 0;
+    transform: translateX(0) translateY(-6px) rotate(0deg) scale(1);
+  }
+
+  .hand-row .minion-card:hover,
+  .hand-row .minion-card:focus-within,
+  .hand-row .minion-card.drag-source {
+    transform: translateX(0) translateY(-8px) rotate(0deg) scale(1.02);
+  }
+
+  body.touch-press-mode .prep-hand-zone::after {
+    content: "长按后拖到战场，或点选后点战场";
+    color: rgba(84, 61, 55, 0.82);
+  }
+
+  body.touch-drag-active .prep-board-zone,
+  body.dragging-card .prep-board-zone {
+    background:
+      radial-gradient(circle at 50% 36%, rgba(255, 210, 116, 0.24), transparent 42%),
+      linear-gradient(180deg, rgba(255, 246, 221, 0.52), rgba(255, 252, 240, 0.24));
+    box-shadow:
+      inset 0 0 0 1px rgba(180, 122, 37, 0.22),
+      0 14px 22px rgba(145, 95, 33, 0.1);
+  }
+
+  body.touch-drag-active .prep-board-zone::after,
+  body.dragging-card .prep-board-zone::after {
+    content: var(--drop-slot-label, "拖到这里松手上场");
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(120, 73, 26, 0.88);
+    color: #fff7ea;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    box-shadow: 0 8px 16px rgba(76, 44, 15, 0.14);
+    opacity: 1;
+  }
+
+  body.touch-drag-active .prep-board-zone.drop-target::before,
+  body.dragging-card .prep-board-zone.drop-target::before {
+    content: "";
+    position: absolute;
+    top: 40px;
+    bottom: 12px;
+    left: calc(10px + (var(--drop-slot-index, 0) * 108px));
+    width: 4px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(229, 175, 73, 0.98), rgba(168, 103, 21, 0.98));
+    box-shadow:
+      0 0 0 1px rgba(255, 244, 220, 0.34),
+      0 0 20px rgba(214, 158, 64, 0.24);
+    transform: translateX(-8px);
+    opacity: 1;
+  }
+
+  .hand-tray-hotspot {
+    left: 0;
+    right: 0;
+    bottom: -4px;
+    width: auto;
+    height: 72px;
+    transform: none;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .prep-hand-zone::after {
+    bottom: 6px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
+
+  .battle-overlay-panel {
+    padding: 12px;
+  }
+
+  .battle-arena {
+    gap: 12px;
+    padding: 16px 12px;
+    border-radius: 20px;
+  }
+
+  .battle-side .battle-board {
+    min-height: 148px;
+  }
+
+  .discover-overlay {
+    padding: 12px;
+  }
+
+  .discover-panel {
+    width: min(100%, 560px);
+    padding: 20px 16px 22px;
+    border-radius: 20px;
+  }
+
+  .discover-title {
+    font-size: 22px;
+  }
+
+  .discover-subtitle {
+    font-size: 13px;
+  }
+
+  .discover-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 16px;
   }
 
   .versus-banner {
     width: 72px;
     height: 72px;
     font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --card-width: 100px;
+  }
+
+  .game-shell {
+    width: calc(100vw - 8px);
+    margin: 4px auto;
+    padding: 8px;
+    border-radius: 16px;
+    min-height: calc(100vh - 8px);
+  }
+
+  .hud-panel,
+  .panel,
+  .prep-zone,
+  .discover-panel,
+  .battle-arena {
+    border-radius: 16px;
+  }
+
+  .stat-grid {
+    gap: 6px;
+  }
+
+  .status-card {
+    padding: 9px 10px;
+  }
+
+  .status-card strong {
+    font-size: 18px;
+  }
+
+  .lobby-roster {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-title {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .shop-title h1 {
+    align-self: flex-start;
+  }
+
+  .compact-countdown {
+    width: 100%;
+    max-width: none;
+  }
+
+  .top-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #upgrade-btn {
+    grid-column: auto;
+  }
+
+  .action-btn {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .prep-panel {
+    gap: 12px;
+    padding: 12px 10px 8px;
+  }
+
+  .prep-zone {
+    padding: 10px;
+  }
+
+  .shop-row .minion-card,
+  .board-row .minion-card {
+    flex-basis: 100px;
+    min-height: 160px;
+  }
+
+  .battle-board .minion-card {
+    flex-basis: 106px;
+  }
+
+  .hand-row {
+    min-height: 148px;
+    padding-bottom: 12px;
+  }
+
+  .hand-row .minion-card {
+    flex-basis: 96px;
+    width: 96px;
+    min-height: 156px;
+    padding: 10px 8px 12px;
+  }
+
+  .minion-name {
+    font-size: 14px;
+  }
+
+  .hand-row .minion-name {
+    font-size: 13px;
+  }
+
+  .minion-meta,
+  .hand-row .minion-meta {
+    font-size: 12px;
+  }
+
+  .minion-text,
+  .minion-info-text {
+    font-size: 9px;
+  }
+
+  .discover-choices {
+    grid-template-columns: 1fr;
+  }
+
+  .versus-banner {
+    width: 58px;
+    height: 58px;
+    font-size: 19px;
   }
 }

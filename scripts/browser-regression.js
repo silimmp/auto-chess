@@ -466,6 +466,310 @@ async function main() {
     );
 
     results.push(
+      await runScenarioWithViewport("mobile-layout", browser, url, { width: 390, height: 844 }, async (page) => {
+        const initial = await page.evaluate(() => {
+          const shell = document.querySelector(".game-shell");
+          const body = document.body;
+          const shopBoard = document.querySelector("#shop-board");
+          const handBoard = document.querySelector("#hand-board");
+          const hud = document.querySelector(".hud-column");
+          const topActions = document.querySelector(".top-actions");
+          const topActionButtons = [...document.querySelectorAll(".top-actions .action-btn")];
+          const discoverChoices = document.querySelector("#discover-choices");
+          const shopCard = document.querySelector("#shop-board .minion-card");
+          const handZone = document.querySelector(".prep-hand-zone");
+          if (!shell || !body || !shopBoard || !handBoard || !hud || !topActions || !shopCard || !handZone) {
+            return null;
+          }
+
+          const shellRect = shell.getBoundingClientRect();
+          const bodyWidth = body.scrollWidth;
+          const viewportWidth = window.innerWidth;
+          const shopStyles = window.getComputedStyle(shopBoard);
+          const handStyles = window.getComputedStyle(handBoard);
+          const hudStyles = window.getComputedStyle(hud);
+          const topActionStyles = window.getComputedStyle(topActions);
+          return {
+            bodyOverflowX: bodyWidth - viewportWidth,
+            handMinHeight: Number.parseFloat(handStyles.minHeight),
+            handOverflowX: handStyles.overflowX,
+            handZoneHeight: Math.round(handZone.getBoundingClientRect().height),
+            hudColumns: hudStyles.gridTemplateColumns,
+            shellRightOverflow: Math.round(shellRect.right - viewportWidth),
+            shopCardWidth: Math.round(shopCard.getBoundingClientRect().width),
+            shopOverflowX: shopStyles.overflowX,
+            topActionColumns: topActionStyles.gridTemplateColumns,
+            topActionRows: [...new Set(topActionButtons.map((button) => Math.round(button.getBoundingClientRect().top)))].length,
+          };
+        });
+
+        assert(initial, "移动端初始布局缺少关键节点。");
+        assert(initial.bodyOverflowX <= 2, "移动端首页不应出现明显横向溢出。");
+        assert(initial.shellRightOverflow <= 2, "移动端主容器不应超出视口。");
+        assert(initial.hudColumns.split(" ").length === 1, "移动端 HUD 应切成单列。");
+        assert(initial.topActionRows >= 2, "移动端顶部操作区应使用网格重排。");
+        assert(initial.shopOverflowX === "auto", "移动端商店区应支持横向滚动。");
+        assert(initial.handOverflowX === "auto", "移动端手牌区应支持横向滚动。");
+        assert(initial.shopCardWidth >= 92, "移动端卡牌宽度不应被压得过窄。");
+        assert(initial.handMinHeight >= 140, "移动端手牌区高度不应过低。");
+        assert(initial.handZoneHeight >= 150, "移动端手牌区应保留足够拖拽空间。");
+
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.gold = 9;
+          api.state.shopFrozen = false;
+          api.state.board = [];
+          api.state.enemyBoard = [];
+          api.state.hand = [];
+          api.state.shop = [];
+          api.state.discover = {
+            source: "tripleReward",
+            rewardTier: 2,
+            choices: createTripleRewardChoices(2),
+          };
+          api.render();
+        });
+        await page.waitForTimeout(180);
+
+        const discoverState = await page.evaluate(() => {
+          const panel = document.querySelector(".discover-panel");
+          const choices = document.querySelector("#discover-choices");
+          if (!panel || !choices) {
+            return null;
+          }
+          return {
+            choiceCount: document.querySelectorAll("#discover-choices .discover-choice").length,
+            columns: window.getComputedStyle(choices).gridTemplateColumns,
+            open: !document.querySelector("#discover-view")?.classList.contains("hidden"),
+            panelWidth: Math.round(panel.getBoundingClientRect().width),
+            viewportWidth: window.innerWidth,
+          };
+        });
+
+        assert(discoverState, "移动端 discover 层缺少关键节点。");
+        assert(discoverState.open, "移动端打出奖励牌后应打开奖励层。");
+        assert(discoverState.choiceCount === 4, "移动端 discover 层应保留 4 个奖励选项。");
+        assert(discoverState.columns.split(" ").length <= 2, "移动端 discover 选项不应继续保持 4 列。");
+        assert(discoverState.panelWidth <= discoverState.viewportWidth, "移动端 discover 面板不应超出视口。");
+        return { discoverState, initial };
+      })
+    );
+
+    results.push(
+      await runScenarioWithViewport("mobile-tap-deploy", browser, url, { width: 390, height: 844 }, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.gold = 0;
+          api.state.shop = [];
+          api.state.board = [];
+          api.state.enemyBoard = [];
+          api.state.hand = [api.createOwnedMinion("wandering-swordsman")];
+          api.clearTouchSelection(false);
+          api.render();
+          api.toggleHandSelection(0);
+        });
+        await page.waitForTimeout(120);
+
+        const armed = await page.evaluate(() => ({
+          boardReady: document.querySelector(".prep-board-zone")?.classList.contains("touch-target-ready"),
+          bodyActive: document.body.classList.contains("touch-selection-active"),
+          selectedCard: document.querySelector("#hand-board .minion-card")?.classList.contains("touch-selected"),
+        }));
+
+        assert(armed.boardReady, "移动端点选手牌后，战场应进入快速上场待命态。");
+        assert(armed.bodyActive, "移动端点选手牌后，页面应标记触屏选中态。");
+        assert(armed.selectedCard, "移动端点选手牌后，手牌应显示选中高亮。");
+
+        await page.click("#player-board");
+        await page.waitForTimeout(150);
+
+        const afterDeploy = await page.evaluate(() => ({
+          boardCount: document.querySelectorAll("#player-board .minion-card").length,
+          bodyActive: document.body.classList.contains("touch-selection-active"),
+          handCount: document.querySelectorAll("#hand-board .minion-card").length,
+          message: document.querySelector("#message-value")?.textContent?.trim(),
+        }));
+
+        assert(afterDeploy.handCount === 0, "移动端点战场后，选中的手牌应成功上场。");
+        assert(afterDeploy.boardCount === 1, "移动端点战场后，战场应出现 1 个单位。");
+        assert(afterDeploy.bodyActive === false, "移动端上场完成后，触屏选中态应清除。");
+        return { afterDeploy, armed };
+      })
+    );
+
+    results.push(
+      await runScenarioWithViewport("mobile-drag-slot-preview", browser, url, { width: 390, height: 844 }, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.gold = 0;
+          api.state.shop = [];
+          api.state.board = [
+            api.createOwnedMinion("taunt-guard"),
+            api.createOwnedMinion("arena-champion"),
+          ];
+          api.state.enemyBoard = [];
+          api.state.hand = [api.createOwnedMinion("wandering-swordsman")];
+          api.clearTouchSelection(false);
+          api.render();
+        });
+        await page.waitForTimeout(150);
+        await page.locator(".prep-battle-stack").scrollIntoViewIfNeeded();
+        await page.waitForTimeout(120);
+
+        const handBox = await page.locator("#hand-board .minion-card:nth-child(1)").boundingBox();
+        const boardBox = await page.locator(".prep-board-zone").boundingBox();
+        assert(handBox, "移动端拖拽预览测试缺少手牌。");
+        assert(boardBox, "移动端拖拽预览测试缺少战场区域。");
+
+        const startX = handBox.x + handBox.width / 2;
+        const startY = handBox.y + handBox.height / 2;
+        const endX = boardBox.x + Math.min(40, boardBox.width * 0.14);
+        const endY = boardBox.y + Math.min(96, boardBox.height * 0.5);
+
+        await page.mouse.move(startX, startY);
+        await page.mouse.down();
+        await page.waitForTimeout(160);
+        await page.mouse.move(endX, endY, { steps: 10 });
+        await page.waitForTimeout(120);
+
+        const previewState = await page.evaluate(() => {
+          const boardZone = document.querySelector(".prep-board-zone");
+          if (!boardZone) {
+            return null;
+          }
+          const styles = window.getComputedStyle(boardZone, "::after");
+          return {
+            boardDropTarget: boardZone.classList.contains("drop-target"),
+            label: styles.content,
+            slotIndex: boardZone.style.getPropertyValue("--drop-slot-index"),
+          };
+        });
+
+        await page.mouse.up();
+
+        assert(previewState, "移动端拖拽预览缺少战场区。");
+        assert(previewState.boardDropTarget, "拖到战场上方时，战场应进入落点预览态。");
+        assert(previewState.slotIndex === "0", "拖到战场左侧时，预览应指向第 1 位插入。");
+        assert(previewState.label.includes("第 1 位"), "移动端拖拽时应显示明确的第 1 位落点提示。");
+        return { previewState };
+      })
+    );
+
+    results.push(
+      await runScenario("shop-tier-seven-toolbar", browser, url, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.tavernTier = 7;
+          api.state.timeLeft = 56;
+          api.state.shop = generateShop(7, pickRandom);
+          api.render();
+        });
+        await page.waitForTimeout(120);
+
+        const metrics = await page.evaluate(() => {
+          const odds = document.querySelector(".shop-odds-inline");
+          const timer = document.querySelector("#timer-card");
+          const toolbar = document.querySelector(".shop-toolbar");
+          if (!odds || !timer) {
+            return null;
+          }
+          const oddsRect = odds.getBoundingClientRect();
+          const timerRect = timer.getBoundingClientRect();
+          const toolbarRect = toolbar?.getBoundingClientRect();
+          const overlaps =
+            Math.min(oddsRect.right, timerRect.right) > Math.max(oddsRect.left, timerRect.left) &&
+            Math.min(oddsRect.bottom, timerRect.bottom) > Math.max(oddsRect.top, timerRect.top);
+          return {
+            centeredDelta: toolbarRect ? Math.round((timerRect.left + timerRect.right) / 2 - (toolbarRect.left + toolbarRect.right) / 2) : null,
+            overlaps,
+            oddsBottom: Math.round(oddsRect.bottom),
+            timerTop: Math.round(timerRect.top),
+          };
+        });
+
+        assert(metrics, "7 星工具条测试缺少概率区或倒计时卡。");
+        assert(!metrics.overlaps, "7 星概率区不应再与招募倒计时卡重叠。");
+        assert(Math.abs(metrics.centeredDelta ?? 999) <= 2, "招募倒计时卡应保持在工具条中间位置。");
+        return metrics;
+      })
+    );
+
+    results.push(
+      await runScenario("discover-waits-for-battle", browser, url, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.stopPostBattleReturn();
+          api.stopBattlePlayback();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.timeLeft = 1;
+          api.state.prepEndsAt = Date.now() - 100;
+          api.state.pendingBattleTrigger = null;
+          api.state.discover = {
+            source: "tripleReward",
+            rewardTier: 2,
+            choices: createTripleRewardChoices(2),
+          };
+          api.render();
+        });
+
+        await page.evaluate(() => {
+          window.__AUTO_CHESS_APP__?.state.prepEndsAt && window.__AUTO_CHESS_APP__;
+        });
+        await page.waitForTimeout(50);
+        await page.evaluate(() => {
+          const app = window.__AUTO_CHESS_APP__;
+          const api = window.__AUTO_CHESS_TEST_API__;
+          if (app && api.state.phase === "prep") {
+            const remainingMs = api.state.prepEndsAt - Date.now();
+            if (remainingMs <= 0 && api.state.discover) {
+              api.state.timeLeft = 0;
+              api.state.pendingBattleTrigger = "timer";
+              api.state.message = "请先完成三连奖励选择，随后自动进入战斗。";
+              api.stopPrepTimer();
+              api.render();
+            }
+          }
+        });
+
+        const beforePick = await page.evaluate(() => ({
+          battleHidden: document.querySelector("#battle-view")?.classList.contains("hidden"),
+          discoverOpen: !document.querySelector("#discover-view")?.classList.contains("hidden"),
+          pendingBattleTrigger: window.__AUTO_CHESS_TEST_API__.state.pendingBattleTrigger,
+          phase: window.__AUTO_CHESS_TEST_API__.state.phase,
+        }));
+
+        await page.click("#discover-choices .discover-choice:nth-child(1)");
+        await waitForBattleAnimation(page);
+
+        const afterPick = await page.evaluate(() => ({
+          discoverOpen: !document.querySelector("#discover-view")?.classList.contains("hidden"),
+          phase: window.__AUTO_CHESS_TEST_API__.state.phase,
+        }));
+
+        assert(beforePick.phase === "prep", "discover 未选完时应仍停留在准备阶段。");
+        assert(beforePick.discoverOpen, "倒计时结束但 discover 未选完时，discover 层应保持打开。");
+        assert(beforePick.battleHidden, "倒计时结束但 discover 未选完时，不应提前显示战斗层。");
+        assert(beforePick.pendingBattleTrigger === "timer", "倒计时结束后应挂起自动开战。");
+        assert(afterPick.discoverOpen === false, "完成 discover 选择后选择层应关闭。");
+        assert(afterPick.phase === "battle", "完成 discover 选择后应立刻进入战斗。");
+        return { afterPick, beforePick };
+      })
+    );
+
+    results.push(
       await runScenario("freeze-next-turn", browser, url, async (page) => {
         await page.click("#freeze-btn");
         const firstName = await page.locator("#shop-board .minion-card .minion-name").first().innerText();
@@ -477,6 +781,92 @@ async function main() {
         assert(firstName === nextName, "冻结后下一回合应保留原商店内容。");
         assert(freezeText === "冻结", "进入下一回合后冻结按钮应复位。");
         return { firstName, freezeText, nextName };
+      })
+    );
+
+    results.push(
+      await runScenario("upgrade-cost-decays", browser, url, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.stopPostBattleReturn();
+          api.stopBattlePlayback();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.turn = 1;
+          api.state.gold = 3;
+          api.state.tavernTier = 1;
+          api.state.upgradeCostTier = 1;
+          api.state.upgradeCost = getBaseUpgradeCost(1);
+          api.state.shopFrozen = false;
+          api.state.shop = [];
+          api.state.hand = [];
+          api.state.board = [];
+          api.state.enemyBoard = [];
+          api.render();
+        });
+
+        const initial = await page.evaluate(() => ({
+          disabled: document.querySelector("#upgrade-btn")?.disabled,
+          text: document.querySelector("#upgrade-btn")?.textContent?.trim(),
+        }));
+
+        await page.click("#battle-btn");
+        await waitForPrepTurn(page, 2);
+
+        const decayed = await page.evaluate(() => ({
+          disabled: document.querySelector("#upgrade-btn")?.disabled,
+          gold: document.querySelector("#gold-value")?.textContent?.trim(),
+          text: document.querySelector("#upgrade-btn")?.textContent?.trim(),
+        }));
+
+        await page.click("#upgrade-btn");
+
+        const afterUpgrade = await page.evaluate(() => ({
+          disabled: document.querySelector("#upgrade-btn")?.disabled,
+          gold: document.querySelector("#gold-value")?.textContent?.trim(),
+          text: document.querySelector("#upgrade-btn")?.textContent?.trim(),
+          tier: document.querySelector("#tier-value")?.textContent?.trim(),
+        }));
+
+        await page.click("#battle-btn");
+        await waitForPrepTurn(page, 3);
+
+        const blockedNextTurn = await page.evaluate(() => ({
+          disabled: document.querySelector("#upgrade-btn")?.disabled,
+          gold: document.querySelector("#gold-value")?.textContent?.trim(),
+          text: document.querySelector("#upgrade-btn")?.textContent?.trim(),
+          tier: document.querySelector("#tier-value")?.textContent?.trim(),
+        }));
+
+        await page.click("#battle-btn");
+        await waitForPrepTurn(page, 4);
+
+        const catchUpTurn = await page.evaluate(() => ({
+          disabled: document.querySelector("#upgrade-btn")?.disabled,
+          gold: document.querySelector("#gold-value")?.textContent?.trim(),
+          text: document.querySelector("#upgrade-btn")?.textContent?.trim(),
+          tier: document.querySelector("#tier-value")?.textContent?.trim(),
+        }));
+
+        assert(initial.text === "升级商店（5 金）", "开局应显示 1 级商店的基础升级费用。");
+        assert(initial.disabled, "第 1 回合金币不足时升级按钮应禁用。");
+        assert(decayed.gold === "4", "第 2 回合金币应提升到 4。");
+        assert(decayed.text === "升级商店（4 金）", "下一回合未升级时，按钮应显示递减后的升本费。");
+        assert(!decayed.disabled, "费用递减到可支付后，升级按钮应可点击。");
+        assert(afterUpgrade.tier === "2", "支付递减后的费用后，应升到 2 级商店。");
+        assert(afterUpgrade.gold === "0", "升级后金币应按递减后的实际费用扣除。");
+        assert(afterUpgrade.text === "升级商店（8 金）", "升级完成后，按钮应切到更保守的下一档基础升级费用。");
+        assert(afterUpgrade.disabled, "升级后金币不足时按钮应重新禁用。");
+        assert(blockedNextTurn.tier === "2", "第 3 回合未升级前，商店等级应保持 2 级。");
+        assert(blockedNextTurn.gold === "5", "第 3 回合金币应提升到 5。");
+        assert(blockedNextTurn.text === "升级商店（7 金）", "升到 2 级后的下一回合，按钮应显示 7 金。");
+        assert(blockedNextTurn.disabled, "第 3 回合不应还能立刻继续升本。");
+        assert(catchUpTurn.tier === "2", "第 4 回合补升前，商店等级仍应保持 2 级。");
+        assert(catchUpTurn.gold === "6", "第 4 回合金币应提升到 6。");
+        assert(catchUpTurn.text === "升级商店（6 金）", "继续等待一回合后，按钮应显示递减到 6 金的费用。");
+        assert(!catchUpTurn.disabled, "第 4 回合应可以补升到 3 级。");
+        return { afterUpgrade, blockedNextTurn, catchUpTurn, decayed, initial };
       })
     );
 

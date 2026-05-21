@@ -321,26 +321,99 @@ function testEconomyCurve(projectRoot) {
   const harness = createHarness(projectRoot);
   harness.run(`
     const state = window.__AUTO_CHESS_TEST_API__.state;
-    state.turn = 4;
-    state.gold = 0;
+    state.turn = 1;
+    state.gold = 3;
+    state.tavernTier = 1;
+    state.upgradeCost = getBaseUpgradeCost(1);
+    state.upgradeCostTier = 1;
     startNextTurnState(
       state,
       (tier) => generateShop(tier, pickRandom),
       (shop, tier) => refillShop(shop, tier, pickRandom),
       (turn) => generateEnemyBoard(turn, pickRandom, randomInt)
     );
-    globalThis.__economySummary = {
+    const beforeUpgrade = {
       turn: state.turn,
       gold: state.gold,
-      upgrade2: UPGRADE_COSTS[2],
-      upgrade6: UPGRADE_COSTS[6],
+      cost: getCurrentUpgradeCost(state),
+    };
+    upgradeTavernState(state, UPGRADE_COSTS, (tier) => generateShop(tier, pickRandom));
+    const afterUpgrade = {
+      tier: state.tavernTier,
+      gold: state.gold,
+      cost: getCurrentUpgradeCost(state),
+    };
+    startNextTurnState(
+      state,
+      (tier) => generateShop(tier, pickRandom),
+      (shop, tier) => refillShop(shop, tier, pickRandom),
+      (turn) => generateEnemyBoard(turn, pickRandom, randomInt)
+    );
+    const blockedTurn = {
+      turn: state.turn,
+      gold: state.gold,
+      cost: getCurrentUpgradeCost(state),
+      canUpgrade: upgradeTavernState(state, UPGRADE_COSTS, (tier) => generateShop(tier, pickRandom)),
+      tier: state.tavernTier,
+    };
+    startNextTurnState(
+      state,
+      (tier) => generateShop(tier, pickRandom),
+      (shop, tier) => refillShop(shop, tier, pickRandom),
+      (turn) => generateEnemyBoard(turn, pickRandom, randomInt)
+    );
+    const catchUpTurn = {
+      turn: state.turn,
+      gold: state.gold,
+      cost: getCurrentUpgradeCost(state),
+      canUpgrade: upgradeTavernState(state, UPGRADE_COSTS, (tier) => generateShop(tier, pickRandom)),
+      tier: state.tavernTier,
+      goldAfterUpgrade: state.gold,
+    };
+    globalThis.__economySummary = {
+      beforeUpgrade,
+      afterUpgrade,
+      blockedTurn,
+      catchUpTurn,
     };
   `);
   const summary = harness.run("__economySummary");
-  assert(summary.turn === 5, "经济曲线测试应推进到第 5 回合。");
-  assert(summary.gold === 8, "第 5 回合金币应提升到 8。");
-  assert(summary.upgrade2 === 6, "2 级升本费用应下调到 6。");
-  assert(summary.upgrade6 === 10, "6 级升本费用应下调到 10。");
+  assert(summary.beforeUpgrade.turn === 2, "经济曲线测试应先推进到第 2 回合。");
+  assert(summary.beforeUpgrade.gold === 4, "第 2 回合金币应提升到 4。");
+  assert(summary.beforeUpgrade.cost === 4, "未升级时，升 2 费应在下一回合自动递减。");
+  assert(summary.afterUpgrade.tier === 2, "支付费用后应成功升到 2 级商店。");
+  assert(summary.afterUpgrade.gold === 0, "第 2 回合升本后金币应按递减后的价格扣到 0。");
+  assert(summary.afterUpgrade.cost === 8, "升到 2 级后，应重置为更保守的升 3 基础费用。");
+  assert(summary.blockedTurn.turn === 3, "经济曲线测试应推进到第 3 回合。");
+  assert(summary.blockedTurn.gold === 5, "第 3 回合金币应提升到 5。");
+  assert(summary.blockedTurn.cost === 7, "升到 2 级后的下一回合，升 3 费用应只递减到 7。");
+  assert(summary.blockedTurn.canUpgrade === false, "第 3 回合不应还能立刻继续升本。");
+  assert(summary.blockedTurn.tier === 2, "买不起升本时，商店等级不应变化。");
+  assert(summary.catchUpTurn.turn === 4, "经济曲线测试应继续推进到第 4 回合。");
+  assert(summary.catchUpTurn.gold === 6, "第 4 回合金币应提升到 6。");
+  assert(summary.catchUpTurn.cost === 6, "继续等待一回合后，升 3 费用应递减到 6。");
+  assert(summary.catchUpTurn.canUpgrade === true, "第 4 回合应可以补升到 3 级。");
+  assert(summary.catchUpTurn.tier === 3, "第 4 回合补升后应进入 3 级商店。");
+  assert(summary.catchUpTurn.goldAfterUpgrade === 0, "第 4 回合补升后金币应按递减后的实际费用扣除。");
+}
+
+function testTripleRewardUsesTavernTier(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.phase = "prep";
+    state.hp = 30;
+    state.tavernTier = 5;
+    state.hand = [createOwnedMinion("taunt-guard"), createOwnedMinion("taunt-guard")];
+    state.board = [createOwnedMinion("taunt-guard")];
+    resolveTriples(state);
+    const rewardCard = state.hand.find((card) => card.cardKind === "tripleReward");
+    globalThis.__tripleRewardTierSummary = {
+      rewardTier: rewardCard?.rewardTier ?? null,
+    };
+  `);
+  const summary = harness.run("__tripleRewardTierSummary");
+  assert(summary.rewardTier === 6, "三连奖励应基于当前酒馆等级 + 1，而不是随从自身星级。");
 }
 
 function testEnemyGrowthCurve(projectRoot) {
@@ -374,27 +447,60 @@ function testBattleDamageCurve(projectRoot) {
   `);
   const summary = harness.run("__battleDamageSummary");
   assert(summary.singleTierOne === 1, "单个低星残阵应只造成 1 点伤害。");
-  assert(summary.doubleTierSeven === 5, "两个 7 星残局的伤害应被压到更平滑的区间。");
-  assert(summary.fullBoardHighTier === 11, "高星大残阵仍应造成显著伤害，但不应无限膨胀。");
+  assert(summary.doubleTierSeven === 4, "两个 7 星残局的伤害应被压到更平滑的区间。");
+  assert(summary.fullBoardHighTier === 10, "高星大残阵仍应造成显著伤害，但不应无限膨胀。");
 }
 
 function testCleaveAndPoisonous(projectRoot) {
   const harness = createHarness(projectRoot);
   harness.run(`
     const attacker = createOwnedMinion("mythic-behemoth");
-    const ally = createOwnedMinion("tavern-attendant");
-    const allyTwo = createOwnedMinion("wandering-swordsman");
     const defenderA = createOwnedMinion("taunt-guard");
     const defenderB = createOwnedMinion("arena-champion");
-    const result = simulateBattle([attacker, ally, allyTwo], [defenderA, defenderB]);
+    const player = [attacker];
+    const enemy = [defenderA, defenderB];
+    const logs = [];
+    const frames = [];
+    performSingleAttack(player, enemy, logs, frames, "player", attacker, "测试顺劈");
     globalThis.__cleavePoisonSummary = {
-      logs: result.logs,
-      remainingEnemy: result.remainingEnemy.map((minion) => minion.name),
+      logs,
+      remainingEnemy: enemy.map((minion) => ({
+        name: minion.name,
+        health: minion.health,
+      })),
     };
   `);
   const summary = harness.run("__cleavePoisonSummary");
   assert(summary.logs.some((line) => line.includes("顺劈波及")), "顺劈命中时应写入日志。");
-  assert(summary.remainingEnemy.length === 0, "剧毒顺劈应能清空相邻两个目标。");
+  assert(summary.remainingEnemy.length === 0, "顺劈应对随机相邻目标造成等量攻击力伤害。");
+  assert(summary.logs.some((line) => line.includes("敌方 兽人统领 阵亡。")), "顺劈应对随机相邻随从造成等量攻击力伤害。");
+}
+
+function testSplashDamage(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const attacker = createOwnedMinion("stormtusk-behemoth");
+    const defenderA = createOwnedMinion("taunt-guard");
+    const defenderB = createOwnedMinion("arena-champion");
+    const defenderC = createOwnedMinion("tavern-attendant");
+    const player = [attacker];
+    const enemy = [defenderA, defenderB, defenderC];
+    const logs = [];
+    const frames = [];
+    performSingleAttack(player, enemy, logs, frames, "player", attacker, "测试溅射");
+    globalThis.__splashSummary = {
+      logs,
+      remainingEnemy: enemy.map((minion) => ({
+        name: minion.name,
+        health: minion.health,
+      })),
+    };
+  `);
+  const summary = harness.run("__splashSummary");
+  assert(summary.logs.some((line) => line.includes("溅射波及") && line.includes("各造成 1 点伤害")), "溅射命中时应写入 1 点额外伤害日志。");
+  assert(summary.remainingEnemy.length === 2, "溅射不应直接清空额外目标。");
+  assert(summary.remainingEnemy.some((minion) => minion.name === "兽人统领"), "溅射后应保留相邻额外目标。");
+  assert(summary.remainingEnemy.some((minion) => minion.name === "酒馆侍从"), "溅射后应同时保留另一侧相邻目标。");
 }
 
 function testSweepKeyword(projectRoot) {
@@ -924,9 +1030,11 @@ function main() {
     ["high-tier-pool-access", testHighTierPoolAccess],
     ["shop-tier-odds", testShopTierOdds],
     ["economy-curve", testEconomyCurve],
+    ["triple-reward-uses-tavern-tier", testTripleRewardUsesTavernTier],
     ["enemy-growth-curve", testEnemyGrowthCurve],
     ["battle-damage-curve", testBattleDamageCurve],
     ["cleave-poisonous", testCleaveAndPoisonous],
+    ["splash-damage", testSplashDamage],
     ["keyword-sweep", testSweepKeyword],
     ["keyword-combo", testComboKeyword],
     ["keyword-barrier", testBarrierKeyword],

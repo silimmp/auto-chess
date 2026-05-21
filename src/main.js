@@ -8,6 +8,11 @@ function startGameApp() {
   let battleAnimationTimerId = null;
   let battleAnimationRunId = 0;
   let dragState = createDragState();
+  let touchSelection = {
+    active: false,
+    sourceZone: "",
+    index: -1,
+  };
 
   const elements = createElements();
   const prepZones = createPrepZones(elements);
@@ -18,6 +23,8 @@ function startGameApp() {
   elements.freezeBtn?.addEventListener("click", toggleFreezeShop);
   elements.battleBtn?.addEventListener("click", () => endTurnAndBattle("manual"));
   elements.resetBtn?.addEventListener("click", resetGame);
+  elements.board?.addEventListener("click", handleBoardTapDeploy);
+  elements.hand?.addEventListener("click", handleHandZoneTap);
 
   window.addEventListener("pointermove", handleGlobalPointerMove);
   window.addEventListener("pointerup", handleGlobalPointerUp);
@@ -29,10 +36,12 @@ function startGameApp() {
       buyMinion,
       buyMinionToZone,
       chooseDiscoverReward,
+      clearTouchSelection,
       moveBoardMinion,
       moveHandMinion,
       playCardFromHand,
       sellMinionFromZone,
+      toggleHandSelection,
     },
     dragState,
     elements,
@@ -53,9 +62,11 @@ function startGameApp() {
     render,
     resetGame,
     state,
+    touchSelection,
   };
   window.__AUTO_CHESS_TEST_API__ = {
     cleanupDragState,
+    clearTouchSelection,
     copyMinion,
     createOwnedMinion,
     syncEnemyBoard(board) {
@@ -74,10 +85,12 @@ function startGameApp() {
     startNextTurn,
     startPrepPhase,
     state,
+    toggleHandSelection,
     chooseDiscoverReward,
     stopBattlePlayback,
     stopPostBattleReturn,
     stopPrepTimer,
+    touchSelection,
   };
   startGameApp.instance = app;
   return app;
@@ -108,6 +121,7 @@ function startGameApp() {
     stopPostBattleReturn();
     stopBattlePlayback();
     cleanupDragState();
+    clearTouchSelection(false);
     const freshState = createInitialState(generateShop, generateEnemyBoard, pickRandom, randomInt);
     Object.assign(state, freshState);
     startPrepPhase();
@@ -117,6 +131,7 @@ function startGameApp() {
     renderGame({
       state,
       dragState,
+      touchSelection,
       elements,
       cleanupDragState,
       bindPrepCardInteractions,
@@ -128,6 +143,7 @@ function startGameApp() {
     renderGame({
       state,
       dragState,
+      touchSelection,
       elements,
       cleanupDragState,
       bindPrepCardInteractions,
@@ -152,30 +168,41 @@ function startGameApp() {
 
   function toggleFreezeShop() {
     if (toggleFreezeShopState(state)) {
+      clearTouchSelection(false);
       render();
     }
   }
 
   function buyMinion(shopIndex) {
     if (buyMinionState(state, shopIndex)) {
+      clearTouchSelection(false);
       render();
     }
   }
 
   function buyMinionToZone(shopIndex, targetZone = "hand", targetIndex = null) {
     if (buyMinionToZoneState(state, shopIndex, targetZone, targetIndex)) {
+      clearTouchSelection(false);
       render();
     }
   }
 
   function chooseDiscoverReward(choiceIndex) {
     if (chooseDiscoverRewardState(state, choiceIndex)) {
+      clearTouchSelection(false);
+      const pendingBattleTrigger = state.pendingBattleTrigger;
+      state.pendingBattleTrigger = null;
+      if (pendingBattleTrigger) {
+        endTurnAndBattle(pendingBattleTrigger);
+        return;
+      }
       render();
     }
   }
 
   function playCardFromHand(index, targetIndex = getCenterInsertIndex(state.board.length)) {
     if (playCardFromHandState(state, index, { targetIndex })) {
+      clearTouchSelection(false);
       render();
     }
   }
@@ -188,26 +215,102 @@ function startGameApp() {
 
   function moveHandMinion(index, targetIndex) {
     if (moveHandMinionState(state, index, targetIndex)) {
+      clearTouchSelection(false);
       render();
     }
   }
 
   function moveBoardMinion(index, targetIndex) {
     if (moveBoardMinionState(state, index, targetIndex)) {
+      clearTouchSelection(false);
       render();
     }
   }
 
   function sellMinionFromZone(zone, index) {
     if (sellMinionFromZoneState(state, zone, index)) {
+      clearTouchSelection(false);
       render();
     }
+  }
+
+  function toggleHandSelection(index) {
+    if (state.phase !== "prep" || state.hp <= 0 || state.discover || !requiresTouchLayout()) {
+      return false;
+    }
+    if (!state.hand[index]) {
+      return false;
+    }
+
+    const shouldClear = touchSelection.active && touchSelection.sourceZone === "hand" && touchSelection.index === index;
+    if (shouldClear) {
+      clearTouchSelection();
+      return true;
+    }
+
+    touchSelection.active = true;
+    touchSelection.sourceZone = "hand";
+    touchSelection.index = index;
+    state.message = `已选中 ${state.hand[index].name}，点一下战场即可上场，或长按继续拖拽。`;
+    render();
+    return true;
+  }
+
+  function clearTouchSelection(shouldRender = true) {
+    const wasActive = touchSelection.active;
+    touchSelection.active = false;
+    touchSelection.sourceZone = "";
+    touchSelection.index = -1;
+    if (wasActive && shouldRender) {
+      render();
+    }
+    return wasActive;
+  }
+
+  function requiresTouchLayout() {
+    return window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(max-width: 760px)").matches;
+  }
+
+  function handleBoardTapDeploy(event) {
+    if (!touchSelection.active || touchSelection.sourceZone !== "hand" || !requiresTouchLayout()) {
+      return;
+    }
+    if (event.target.closest("button")) {
+      return;
+    }
+
+    const targetIndex = getBoardTapInsertIndex(event.clientX);
+    playCardFromHand(touchSelection.index, targetIndex);
+  }
+
+  function handleHandZoneTap(event) {
+    if (!touchSelection.active || !requiresTouchLayout()) {
+      return;
+    }
+    const card = event.target.closest(".minion-card");
+    if (card) {
+      return;
+    }
+    clearTouchSelection();
+  }
+
+  function getBoardTapInsertIndex(clientX) {
+    const cards = [...elements.board.querySelectorAll(".minion-card")];
+    for (let index = 0; index < cards.length; index += 1) {
+      const rect = cards[index].getBoundingClientRect();
+      if (clientX < rect.left + rect.width / 2) {
+        return index;
+      }
+    }
+    return cards.length;
   }
 
   function startPrepPhase() {
     stopPrepTimer();
     stopPostBattleReturn();
     stopBattlePlayback();
+    clearTouchSelection(false);
+    state.pendingBattleTrigger = null;
     state.phase = "prep";
     state.timeLeft = getPrepDuration(state.turn);
     state.prepEndsAt = Date.now() + state.timeLeft * 1000;
@@ -238,6 +341,14 @@ function startGameApp() {
       renderStatusOnly();
     }
     if (remainingMs <= 0) {
+      if (state.discover) {
+        state.timeLeft = 0;
+        state.pendingBattleTrigger = "timer";
+        state.message = "请先完成三连奖励选择，随后自动进入战斗。";
+        stopPrepTimer();
+        render();
+        return;
+      }
       endTurnAndBattle("timer");
     }
   }
@@ -247,6 +358,7 @@ function startGameApp() {
       return;
     }
 
+    clearTouchSelection(false);
     stopPrepTimer();
     stopPostBattleReturn();
     stopBattlePlayback();

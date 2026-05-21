@@ -1,6 +1,10 @@
 function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard, pickRandom, randomInt) {
   state.turn += 1;
   state.gold = getTurnGold(state.turn);
+  const upgradeCost = syncUpgradeCostState(state);
+  if (upgradeCost !== null) {
+    state.upgradeCost = Math.max(0, upgradeCost - 1);
+  }
   state.shop = state.shopFrozen ? refillShop(state.shop, state.tavernTier) : generateShop(state.tavernTier);
   state.shopFrozen = false;
   state.lobby.pairings = createPairings(state.lobby.players, state.turn);
@@ -25,13 +29,15 @@ function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard,
 }
 
 function upgradeTavernState(state, upgradeCosts, generateShop) {
-  const upgradeCost = upgradeCosts[state.tavernTier];
+  const upgradeCost = syncUpgradeCostState(state);
   if (state.phase !== "prep" || upgradeCost === null || state.gold < upgradeCost || state.hp <= 0) {
     return false;
   }
 
   state.gold -= upgradeCost;
   state.tavernTier += 1;
+  state.upgradeCostTier = state.tavernTier;
+  state.upgradeCost = upgradeCosts[state.tavernTier] ?? null;
   state.shop = generateShop(state.tavernTier);
   state.shopFrozen = false;
   state.message = `酒馆升级到 ${state.tavernTier} 级。`;

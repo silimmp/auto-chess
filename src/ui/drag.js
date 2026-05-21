@@ -16,6 +16,7 @@ function createDragState() {
     timerId: null,
     currentZone: "",
     currentIndex: -1,
+    currentSlotLabel: "",
   };
 }
 
@@ -41,6 +42,7 @@ function beginCardDragPress(event, zone, index, card) {
   }
 
   cancelDragInteraction();
+  dragRuntime.actions.clearTouchSelection?.(false);
   event.preventDefault();
 
   try {
@@ -64,6 +66,8 @@ function beginCardDragPress(event, zone, index, card) {
   });
 
   if (requiresLongPressDrag(dragRuntime.dragState.pointerType)) {
+    card.classList.add("touch-press-armed");
+    document.body.classList.add("touch-press-mode");
     dragRuntime.dragState.timerId = window.setTimeout(() => {
       activateDrag();
     }, TOUCH_LONG_PRESS_MS);
@@ -126,6 +130,12 @@ function handleGlobalPointerUp(event) {
           sourceIndex: dragRuntime.dragState.sourceIndex,
         }
       : null;
+  const tapHandSelect =
+    wasPending && dragRuntime.dragState.sourceZone === "hand" && requiresLongPressDrag(dragRuntime.dragState.pointerType)
+      ? {
+          sourceIndex: dragRuntime.dragState.sourceIndex,
+        }
+      : null;
 
   cleanupDragState();
   if (shouldDrop && payload) {
@@ -134,6 +144,10 @@ function handleGlobalPointerUp(event) {
   }
   if (tapPurchase) {
     dragRuntime.actions.buyMinion(tapPurchase.sourceIndex);
+    return;
+  }
+  if (tapHandSelect) {
+    dragRuntime.actions.toggleHandSelection?.(tapHandSelect.sourceIndex);
   }
 }
 
@@ -156,8 +170,12 @@ function activateDrag() {
   dragRuntime.dragState.previewElement = preview;
   dragRuntime.dragState.offsetX = dragRuntime.dragState.startX - rect.left;
   dragRuntime.dragState.offsetY = dragRuntime.dragState.startY - rect.top;
+  dragRuntime.dragState.sourceElement.classList.remove("touch-press-armed");
   dragRuntime.dragState.sourceElement.classList.add("drag-source");
   document.body.classList.add("dragging-card");
+  if (requiresLongPressDrag(dragRuntime.dragState.pointerType)) {
+    document.body.classList.add("touch-drag-active");
+  }
 
   updateDragPreviewPosition(dragRuntime.dragState.pointerX, dragRuntime.dragState.pointerY);
   updateDropTargetState(dragRuntime.dragState.pointerX, dragRuntime.dragState.pointerY);
@@ -179,9 +197,19 @@ function updateDropTargetState(clientX, clientY) {
 
   dragRuntime.dragState.currentZone = zone;
   dragRuntime.dragState.currentIndex = index;
+  dragRuntime.dragState.currentSlotLabel = zone === "board" && index >= 0 ? `将放在第 ${index + 1} 位` : "";
 
   Object.entries(dragRuntime.prepZones).forEach(([key, element]) => {
     element?.classList.toggle("drop-target", key === zone);
+    if (key === "board") {
+      if (zone === "board" && index >= 0) {
+        element?.style.setProperty("--drop-slot-index", String(index));
+        element?.style.setProperty("--drop-slot-label", `"${dragRuntime.dragState.currentSlotLabel}"`);
+      } else {
+        element?.style.removeProperty("--drop-slot-index");
+        element?.style.removeProperty("--drop-slot-label");
+      }
+    }
   });
   dragRuntime.elements.prepPanel?.classList.toggle("sell-armed", zone === "sell");
 }
@@ -401,11 +429,20 @@ function cleanupDragState() {
     }
   }
 
+  dragRuntime.dragState.sourceElement?.classList.remove("touch-press-armed");
   dragRuntime.dragState.sourceElement?.classList.remove("drag-source");
   dragRuntime.dragState.previewElement?.remove();
-  Object.values(dragRuntime.prepZones).forEach((element) => element?.classList.remove("drop-target"));
+  Object.entries(dragRuntime.prepZones).forEach(([key, element]) => {
+    element?.classList.remove("drop-target");
+    if (key === "board") {
+      element?.style.removeProperty("--drop-slot-index");
+      element?.style.removeProperty("--drop-slot-label");
+    }
+  });
   dragRuntime.elements.prepPanel?.classList.remove("sell-armed");
   document.body.classList.remove("dragging-card");
+  document.body.classList.remove("touch-drag-active");
+  document.body.classList.remove("touch-press-mode");
   dragRuntime.setDragState(createDragState());
 }
 

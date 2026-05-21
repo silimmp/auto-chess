@@ -164,7 +164,7 @@ function resolveTriples(state) {
     const base = triple[0].minion;
     removeOwnedEntries(state, triple);
     const golden = createGoldenMinion(base);
-    const rewardTier = Math.min(CONTENT_TIER_CAP, base.tier + 1);
+    const rewardTier = Math.min(CONTENT_TIER_CAP, state.tavernTier + 1);
     const rewardCard = createTripleRewardCard(rewardTier);
     state.hand.unshift(golden);
     state.hand.unshift(rewardCard);

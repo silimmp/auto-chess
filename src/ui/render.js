@@ -1,6 +1,7 @@
 function renderGame({
   state,
   dragState,
+  touchSelection,
   elements,
   cleanupDragState,
   bindPrepCardInteractions,
@@ -28,10 +29,11 @@ function renderGame({
   syncLobbyPanel(state, elements);
   renderDiscover(state, elements);
   elements.battleView.classList.toggle("hidden", isPrep);
+  syncTouchSelectionState(state, touchSelection, elements);
 
   if (!skipZoneRenders && !(isPrep && dragState.status !== "idle")) {
     renderShop(state, elements, bindPrepCardInteractions);
-    renderHand(state, elements, bindPrepCardInteractions);
+    renderHand(state, touchSelection, elements, bindPrepCardInteractions);
     renderPlayerBoard(state, elements, bindPrepCardInteractions);
   }
 
@@ -39,6 +41,17 @@ function renderGame({
     renderBattleBoards(state, elements);
   }
   syncButtons(state, elements);
+}
+
+function syncTouchSelectionState(state, touchSelection, elements) {
+  const selectionActive =
+    state.phase === "prep" &&
+    Boolean(touchSelection?.active) &&
+    touchSelection.sourceZone === "hand" &&
+    touchSelection.index >= 0;
+  document.body.classList.toggle("touch-selection-active", selectionActive);
+  elements.board?.closest(".prep-board-zone")?.classList.toggle("touch-target-ready", selectionActive);
+  elements.hand?.closest(".prep-hand-zone")?.classList.toggle("touch-selection-ready", selectionActive);
 }
 
 function syncLobbyPanel(state, elements) {
@@ -88,7 +101,7 @@ function syncButtons(state, elements) {
   const isPrep = state.phase === "prep";
   const isGameOver = state.hp <= 0 || state.phase === "gameOver";
   const actionsLocked = Boolean(state.discover);
-  const upgradeCost = UPGRADE_COSTS[state.tavernTier];
+  const upgradeCost = getCurrentUpgradeCost(state);
 
   elements.refreshBtn.disabled = !isPrep || isGameOver || actionsLocked || state.gold < REFRESH_COST;
   elements.battleBtn.disabled = !isPrep || isGameOver || actionsLocked;
@@ -122,7 +135,7 @@ function renderShop(state, elements, bindPrepCardInteractions) {
   });
 }
 
-function renderHand(state, elements, bindPrepCardInteractions) {
+function renderHand(state, touchSelection, elements, bindPrepCardInteractions) {
   elements.hand.innerHTML = "";
   elements.hand.dataset.handCount = String(state.hand.length);
   elements.hand.classList.toggle("is-empty", state.hand.length === 0);
@@ -135,6 +148,9 @@ function renderHand(state, elements, bindPrepCardInteractions) {
   const actionsLocked = state.phase !== "prep" || state.hp <= 0;
   state.hand.forEach((minion, index) => {
     const card = buildHandCard(minion, { showActions: false });
+    if (touchSelection?.active && touchSelection.sourceZone === "hand" && touchSelection.index === index) {
+      card.classList.add("touch-selected");
+    }
     bindPrepCardInteractions(card, "hand", index, actionsLocked);
     elements.hand.appendChild(card);
   });
@@ -182,11 +198,17 @@ function renderDiscover(state, elements) {
 
   const discover = state.discover;
   elements.discoverView.classList.toggle("hidden", !discover);
-  elements.discoverChoices.innerHTML = "";
-
   if (!discover) {
+    elements.discoverChoices.innerHTML = "";
+    elements.discoverChoices.__discoverRef = null;
     return;
   }
+
+  if (elements.discoverChoices.__discoverRef === discover) {
+    return;
+  }
+  elements.discoverChoices.__discoverRef = discover;
+  elements.discoverChoices.innerHTML = "";
 
   if (elements.discoverTitle) {
     elements.discoverTitle.textContent = "选择一张奖励随从";

@@ -18,11 +18,11 @@ const TOUCH_DRAG_CANCEL_DISTANCE = 18;
 
 const UPGRADE_COSTS = {
   1: 5,
-  2: 6,
-  3: 7,
-  4: 8,
-  5: 9,
-  6: 10,
+  2: 8,
+  3: 9,
+  4: 11,
+  5: 12,
+  6: 13,
   7: null,
 };
 
@@ -102,6 +102,29 @@ const BATTLE_DAMAGE_TIER_DIVISOR = 4;
 
 function getTurnGold(turn) {
   return TURN_GOLD_BY_TURN[turn] ?? 10;
+}
+
+function getBaseUpgradeCost(tavernTier) {
+  return UPGRADE_COSTS[tavernTier] ?? null;
+}
+
+function getCurrentUpgradeCost(state) {
+  const baseCost = getBaseUpgradeCost(state.tavernTier);
+  if (baseCost === null) {
+    return null;
+  }
+
+  if (state.upgradeCostTier !== state.tavernTier || typeof state.upgradeCost !== "number") {
+    return baseCost;
+  }
+
+  return Math.max(0, Math.min(baseCost, state.upgradeCost));
+}
+
+function syncUpgradeCostState(state) {
+  state.upgradeCost = getCurrentUpgradeCost(state);
+  state.upgradeCostTier = state.tavernTier;
+  return state.upgradeCost;
 }
 
 function getEnemyBoardBaseSize(turn) {
