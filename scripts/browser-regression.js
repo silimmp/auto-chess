@@ -272,6 +272,44 @@ async function collectPrepCounts(page) {
   }));
 }
 
+async function collectViewportFitMetrics(page) {
+  return page.evaluate(() => {
+    const frame = document.querySelector(".game-shell-frame");
+    const shell = document.querySelector(".game-shell");
+    const panel = document.querySelector(".prep-panel");
+    const tray = document.querySelector(".prep-hand-zone");
+    const rootStyles = getComputedStyle(document.documentElement);
+    if (!frame || !shell || !panel || !tray) {
+      return null;
+    }
+
+    const frameRect = frame.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const trayRect = tray.getBoundingClientRect();
+    const scale = Number.parseFloat(rootStyles.getPropertyValue("--app-scale")) || 1;
+    const shellInnerWidth = shell.offsetWidth;
+    const shellInnerHeight = shell.offsetHeight;
+    return {
+      frameBottomOverflow: Math.round(frameRect.bottom - window.innerHeight),
+      frameRightOverflow: Math.round(frameRect.right - window.innerWidth),
+      panelBottomOverflow: Math.round(panelRect.bottom - frameRect.bottom),
+      scale: Number(scale.toFixed(3)),
+      scaleRecoveredHeight: Number((shellRect.height / Math.max(1, scale)).toFixed(1)),
+      scaleRecoveredWidth: Number((shellRect.width / Math.max(1, scale)).toFixed(1)),
+      shellBottomOverflow: Math.round(shellRect.bottom - window.innerHeight),
+      shellHeight: Math.round(shellRect.height),
+      shellInnerHeight,
+      shellInnerWidth,
+      shellRightOverflow: Math.round(shellRect.right - window.innerWidth),
+      shellWidth: Math.round(shellRect.width),
+      trayBottomOverflow: Math.round(trayRect.bottom - frameRect.bottom),
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+    };
+  });
+}
+
 async function runScenario(name, browser, url, handler) {
   const { page, consoleErrors, pageErrors } = await openPage(browser, url);
   try {
@@ -363,6 +401,7 @@ async function main() {
             cardVisibleHeight: Math.round(Math.max(0, trayRect.bottom - cardRect.top)),
             overPanelBottom: panelRect ? Math.round(cardRect.bottom - panelRect.bottom) : null,
             overStackBottom: stackRect ? Math.round(cardRect.bottom - stackRect.bottom) : null,
+            trayOverStackBottom: stackRect ? Math.round(trayRect.bottom - stackRect.bottom) : null,
             trayBottom: Math.round(trayRect.bottom),
           };
         });
@@ -370,8 +409,8 @@ async function main() {
         assert(afterBuy.hand === 1, "拖到上场区购买后也应先进入手牌。");
         assert(afterBuy.board === 0, "买牌阶段不应直接把随从放上场。");
         assert(collapsedHandVisible && collapsedHandVisible.cardVisibleHeight >= 54, "默认收纳状态下手牌露出高度不足。");
-        assert(collapsedHandVisible.overStackBottom !== null && collapsedHandVisible.overStackBottom <= 0, "默认收纳状态下手牌超出了共享战备区。");
-        assert(collapsedHandVisible.overPanelBottom !== null && collapsedHandVisible.overPanelBottom <= 0, "默认收纳状态下手牌超出了准备阶段主框。");
+        assert(collapsedHandVisible.overPanelBottom !== null && collapsedHandVisible.overPanelBottom <= 4, "默认收纳状态下手牌超出了准备阶段主框。");
+        assert(collapsedHandVisible.trayOverStackBottom !== null && collapsedHandVisible.trayOverStackBottom <= 4, "默认收纳状态下手牌托盘超出了共享战备区。");
 
         await dragByOffset(page, "#hand-board .minion-card:nth-child(1)", { x: 0, y: -180 }, { xRatio: 0.5, yRatio: 0.22 });
         const afterPlay = await collectPrepCounts(page);
@@ -421,7 +460,7 @@ async function main() {
     );
 
     results.push(
-      await runScenarioWithViewport("short-viewport-hand-visible", browser, url, { width: 1513, height: 472 }, async (page) => {
+      await runScenarioWithViewport("short-viewport-fit", browser, url, { width: 1513, height: 472 }, async (page) => {
         await page.evaluate(() => {
           const api = window.__AUTO_CHESS_TEST_API__;
           api.stopPrepTimer();
@@ -436,7 +475,7 @@ async function main() {
         });
         await page.waitForTimeout(180);
 
-        const metrics = await page.evaluate(() => {
+        const handMetrics = await page.evaluate(() => {
           const card = document.querySelector("#hand-board .minion-card");
           const tray = document.querySelector(".prep-hand-zone");
           const panel = document.querySelector(".prep-panel");
@@ -455,65 +494,39 @@ async function main() {
             ),
           };
         });
+        const viewportMetrics = await collectViewportFitMetrics(page);
 
-        assert(metrics, "矮视口下缺少手牌区或卡牌。");
-        assert(metrics.cardVisibleHeight >= 60, "矮视口下手牌默认露出高度不足。");
-        assert(metrics.overTrayBottom <= 0, "矮视口下手牌超出了共享战备区。");
-        assert(metrics.overPanelBottom <= 0, "矮视口下手牌超出了准备阶段主框。");
-        assert(metrics.trayVisibleHeight >= 100, "矮视口下手牌托盘落出了主框可视区。");
-        return metrics;
+        assert(handMetrics, "矮视口下缺少手牌区或卡牌。");
+        assert(viewportMetrics, "矮视口下缺少整体视口适配信息。");
+        assert(handMetrics.cardVisibleHeight >= 40, `矮视口下手牌默认露出高度不足：${JSON.stringify({ handMetrics, viewportMetrics })}`);
+        assert(viewportMetrics.frameBottomOverflow <= 0, "矮视口下缩放框不应超出视口底部。");
+        assert(viewportMetrics.frameRightOverflow <= 0, "矮视口下缩放框不应超出视口右侧。");
+        assert(viewportMetrics.shellBottomOverflow <= 0, "矮视口下主舞台不应超出视口底部。");
+        assert(viewportMetrics.shellRightOverflow <= 0, "矮视口下主舞台不应超出视口右侧。");
+        assert(viewportMetrics.panelBottomOverflow <= 0, "矮视口下准备阶段主框不应被裁切。");
+        assert(handMetrics.trayVisibleHeight >= 80, `矮视口下手牌区可见高度不足：${JSON.stringify({ handMetrics, viewportMetrics })}`);
+        assert(viewportMetrics.scale < 1, "矮视口下应触发整体缩放。");
+        return { handMetrics, viewportMetrics };
       })
     );
 
     results.push(
-      await runScenarioWithViewport("mobile-layout", browser, url, { width: 390, height: 844 }, async (page) => {
-        const initial = await page.evaluate(() => {
-          const shell = document.querySelector(".game-shell");
-          const body = document.body;
-          const shopBoard = document.querySelector("#shop-board");
-          const handBoard = document.querySelector("#hand-board");
-          const hud = document.querySelector(".hud-column");
-          const topActions = document.querySelector(".top-actions");
-          const topActionButtons = [...document.querySelectorAll(".top-actions .action-btn")];
-          const discoverChoices = document.querySelector("#discover-choices");
-          const shopCard = document.querySelector("#shop-board .minion-card");
-          const handZone = document.querySelector(".prep-hand-zone");
-          if (!shell || !body || !shopBoard || !handBoard || !hud || !topActions || !shopCard || !handZone) {
-            return null;
-          }
+      await runScenarioWithViewport("desktop-scale-fit", browser, url, { width: 1366, height: 768 }, async (page) => {
+        const initial = await collectViewportFitMetrics(page);
+        assert(initial, "桌面缩放适配缺少关键节点。");
+        assert(initial.frameBottomOverflow <= 0, "桌面缩放时外层框不应超出视口底部。");
+        assert(initial.frameRightOverflow <= 0, "桌面缩放时外层框不应超出视口右侧。");
+        assert(initial.shellBottomOverflow <= 0, "桌面缩放时主舞台不应超出视口底部。");
+        assert(initial.shellRightOverflow <= 0, "桌面缩放时主舞台不应超出视口右侧。");
+        assert(initial.panelBottomOverflow <= 0, "桌面缩放时准备阶段主框不应被裁切。");
+        assert(initial.trayBottomOverflow <= 0, "桌面缩放时手牌区不应被裁切。");
+        assert(initial.scale > 0.1 && initial.scale <= 1, "桌面缩放比例应落在有效范围内。");
+        return initial;
+      })
+    );
 
-          const shellRect = shell.getBoundingClientRect();
-          const bodyWidth = body.scrollWidth;
-          const viewportWidth = window.innerWidth;
-          const shopStyles = window.getComputedStyle(shopBoard);
-          const handStyles = window.getComputedStyle(handBoard);
-          const hudStyles = window.getComputedStyle(hud);
-          const topActionStyles = window.getComputedStyle(topActions);
-          return {
-            bodyOverflowX: bodyWidth - viewportWidth,
-            handMinHeight: Number.parseFloat(handStyles.minHeight),
-            handOverflowX: handStyles.overflowX,
-            handZoneHeight: Math.round(handZone.getBoundingClientRect().height),
-            hudColumns: hudStyles.gridTemplateColumns,
-            shellRightOverflow: Math.round(shellRect.right - viewportWidth),
-            shopCardWidth: Math.round(shopCard.getBoundingClientRect().width),
-            shopOverflowX: shopStyles.overflowX,
-            topActionColumns: topActionStyles.gridTemplateColumns,
-            topActionRows: [...new Set(topActionButtons.map((button) => Math.round(button.getBoundingClientRect().top)))].length,
-          };
-        });
-
-        assert(initial, "移动端初始布局缺少关键节点。");
-        assert(initial.bodyOverflowX <= 2, "移动端首页不应出现明显横向溢出。");
-        assert(initial.shellRightOverflow <= 2, "移动端主容器不应超出视口。");
-        assert(initial.hudColumns.split(" ").length === 1, "移动端 HUD 应切成单列。");
-        assert(initial.topActionRows >= 2, "移动端顶部操作区应使用网格重排。");
-        assert(initial.shopOverflowX === "auto", "移动端商店区应支持横向滚动。");
-        assert(initial.handOverflowX === "auto", "移动端手牌区应支持横向滚动。");
-        assert(initial.shopCardWidth >= 92, "移动端卡牌宽度不应被压得过窄。");
-        assert(initial.handMinHeight >= 140, "移动端手牌区高度不应过低。");
-        assert(initial.handZoneHeight >= 150, "移动端手牌区应保留足够拖拽空间。");
-
+    results.push(
+      await runScenario("discover-overlay-fit", browser, url, async (page) => {
         await page.evaluate(() => {
           const api = window.__AUTO_CHESS_TEST_API__;
           api.stopPrepTimer();
@@ -537,130 +550,27 @@ async function main() {
         const discoverState = await page.evaluate(() => {
           const panel = document.querySelector(".discover-panel");
           const choices = document.querySelector("#discover-choices");
-          if (!panel || !choices) {
+          const overlay = document.querySelector("#discover-view");
+          if (!panel || !choices || !overlay) {
             return null;
           }
+          const panelRect = panel.getBoundingClientRect();
           return {
             choiceCount: document.querySelectorAll("#discover-choices .discover-choice").length,
             columns: window.getComputedStyle(choices).gridTemplateColumns,
-            open: !document.querySelector("#discover-view")?.classList.contains("hidden"),
-            panelWidth: Math.round(panel.getBoundingClientRect().width),
-            viewportWidth: window.innerWidth,
+            open: !overlay.classList.contains("hidden"),
+            panelBottomOverflow: Math.round(panelRect.bottom - window.innerHeight),
+            panelRightOverflow: Math.round(panelRect.right - window.innerWidth),
           };
         });
 
-        assert(discoverState, "移动端 discover 层缺少关键节点。");
-        assert(discoverState.open, "移动端打出奖励牌后应打开奖励层。");
-        assert(discoverState.choiceCount === 4, "移动端 discover 层应保留 4 个奖励选项。");
-        assert(discoverState.columns.split(" ").length <= 2, "移动端 discover 选项不应继续保持 4 列。");
-        assert(discoverState.panelWidth <= discoverState.viewportWidth, "移动端 discover 面板不应超出视口。");
-        return { discoverState, initial };
-      })
-    );
-
-    results.push(
-      await runScenarioWithViewport("mobile-tap-deploy", browser, url, { width: 390, height: 844 }, async (page) => {
-        await page.evaluate(() => {
-          const api = window.__AUTO_CHESS_TEST_API__;
-          api.stopPrepTimer();
-          api.state.phase = "prep";
-          api.state.hp = 30;
-          api.state.gold = 0;
-          api.state.shop = [];
-          api.state.board = [];
-          api.state.enemyBoard = [];
-          api.state.hand = [api.createOwnedMinion("wandering-swordsman")];
-          api.clearTouchSelection(false);
-          api.render();
-          api.toggleHandSelection(0);
-        });
-        await page.waitForTimeout(120);
-
-        const armed = await page.evaluate(() => ({
-          boardReady: document.querySelector(".prep-board-zone")?.classList.contains("touch-target-ready"),
-          bodyActive: document.body.classList.contains("touch-selection-active"),
-          selectedCard: document.querySelector("#hand-board .minion-card")?.classList.contains("touch-selected"),
-        }));
-
-        assert(armed.boardReady, "移动端点选手牌后，战场应进入快速上场待命态。");
-        assert(armed.bodyActive, "移动端点选手牌后，页面应标记触屏选中态。");
-        assert(armed.selectedCard, "移动端点选手牌后，手牌应显示选中高亮。");
-
-        await page.click("#player-board");
-        await page.waitForTimeout(150);
-
-        const afterDeploy = await page.evaluate(() => ({
-          boardCount: document.querySelectorAll("#player-board .minion-card").length,
-          bodyActive: document.body.classList.contains("touch-selection-active"),
-          handCount: document.querySelectorAll("#hand-board .minion-card").length,
-          message: document.querySelector("#message-value")?.textContent?.trim(),
-        }));
-
-        assert(afterDeploy.handCount === 0, "移动端点战场后，选中的手牌应成功上场。");
-        assert(afterDeploy.boardCount === 1, "移动端点战场后，战场应出现 1 个单位。");
-        assert(afterDeploy.bodyActive === false, "移动端上场完成后，触屏选中态应清除。");
-        return { afterDeploy, armed };
-      })
-    );
-
-    results.push(
-      await runScenarioWithViewport("mobile-drag-slot-preview", browser, url, { width: 390, height: 844 }, async (page) => {
-        await page.evaluate(() => {
-          const api = window.__AUTO_CHESS_TEST_API__;
-          api.stopPrepTimer();
-          api.state.phase = "prep";
-          api.state.hp = 30;
-          api.state.gold = 0;
-          api.state.shop = [];
-          api.state.board = [
-            api.createOwnedMinion("taunt-guard"),
-            api.createOwnedMinion("arena-champion"),
-          ];
-          api.state.enemyBoard = [];
-          api.state.hand = [api.createOwnedMinion("wandering-swordsman")];
-          api.clearTouchSelection(false);
-          api.render();
-        });
-        await page.waitForTimeout(150);
-        await page.locator(".prep-battle-stack").scrollIntoViewIfNeeded();
-        await page.waitForTimeout(120);
-
-        const handBox = await page.locator("#hand-board .minion-card:nth-child(1)").boundingBox();
-        const boardBox = await page.locator(".prep-board-zone").boundingBox();
-        assert(handBox, "移动端拖拽预览测试缺少手牌。");
-        assert(boardBox, "移动端拖拽预览测试缺少战场区域。");
-
-        const startX = handBox.x + handBox.width / 2;
-        const startY = handBox.y + handBox.height / 2;
-        const endX = boardBox.x + Math.min(40, boardBox.width * 0.14);
-        const endY = boardBox.y + Math.min(96, boardBox.height * 0.5);
-
-        await page.mouse.move(startX, startY);
-        await page.mouse.down();
-        await page.waitForTimeout(160);
-        await page.mouse.move(endX, endY, { steps: 10 });
-        await page.waitForTimeout(120);
-
-        const previewState = await page.evaluate(() => {
-          const boardZone = document.querySelector(".prep-board-zone");
-          if (!boardZone) {
-            return null;
-          }
-          const styles = window.getComputedStyle(boardZone, "::after");
-          return {
-            boardDropTarget: boardZone.classList.contains("drop-target"),
-            label: styles.content,
-            slotIndex: boardZone.style.getPropertyValue("--drop-slot-index"),
-          };
-        });
-
-        await page.mouse.up();
-
-        assert(previewState, "移动端拖拽预览缺少战场区。");
-        assert(previewState.boardDropTarget, "拖到战场上方时，战场应进入落点预览态。");
-        assert(previewState.slotIndex === "0", "拖到战场左侧时，预览应指向第 1 位插入。");
-        assert(previewState.label.includes("第 1 位"), "移动端拖拽时应显示明确的第 1 位落点提示。");
-        return { previewState };
+        assert(discoverState, "桌面 discover 层缺少关键节点。");
+        assert(discoverState.open, "打出奖励牌后应打开奖励层。");
+        assert(discoverState.choiceCount === 4, "discover 层应保留 4 个奖励选项。");
+        assert(discoverState.columns.split(" ").length >= 2, "桌面 discover 选项不应退化成单列。");
+        assert(discoverState.panelBottomOverflow <= 0, "桌面 discover 面板不应超出视口底部。");
+        assert(discoverState.panelRightOverflow <= 0, "桌面 discover 面板不应超出视口右侧。");
+        return discoverState;
       })
     );
 

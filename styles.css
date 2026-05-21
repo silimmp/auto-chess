@@ -26,6 +26,9 @@
   --countdown-safe-gap: 176px;
   --shell-gap: 16px;
   --shell-padding: 16px;
+  --app-scale: 1;
+  --app-shell-width: calc(100vw - 24px);
+  --app-shell-height: calc(100vh - 24px);
 }
 
 * {
@@ -72,6 +75,22 @@ body::after {
   background-size: 64px 64px;
 }
 
+.app-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.game-shell-frame {
+  position: relative;
+  width: var(--app-shell-width);
+  height: var(--app-shell-height);
+  overflow: hidden;
+}
+
 .shape-defs {
   position: absolute;
   width: 0;
@@ -80,13 +99,15 @@ body::after {
 }
 
 .game-shell {
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 50%;
   display: grid;
   grid-template-columns: var(--hud-width) minmax(0, 1fr);
   gap: var(--shell-gap);
-  width: min(1480px, calc(100vw - 24px));
-  height: calc(100vh - 24px);
-  margin: 12px auto;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   padding: var(--shell-padding);
   border-radius: 34px;
   background:
@@ -98,6 +119,8 @@ body::after {
     inset 0 1px 0 rgba(255, 236, 206, 0.12);
   overflow: hidden;
   isolation: isolate;
+  transform: translate(-50%, -50%) scale(var(--app-scale));
+  transform-origin: center center;
 }
 
 .game-shell::before,
@@ -2270,188 +2293,3 @@ body::after {
   }
 }
 
-@media (max-width: 1280px) {
-  :root {
-    --hud-width: 216px;
-  }
-
-  .game-shell {
-    grid-template-columns: var(--hud-width) minmax(0, 1fr);
-  }
-
-  .shop-title h1 {
-    min-width: 62px;
-    padding-inline: 9px;
-  }
-
-  :root {
-    --card-width: 114px;
-  }
-}
-
-@media (max-width: 1080px) {
-  body {
-    overflow: auto;
-  }
-
-  :root {
-    --hud-width: 0px;
-  }
-
-  .game-shell {
-    grid-template-columns: 1fr;
-    height: auto;
-    min-height: calc(100vh - 24px);
-    overflow: visible;
-  }
-
-  .hud-column {
-    grid-template-rows: auto;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .message-panel {
-    grid-column: 1 / -1;
-  }
-
-  .hud-actions {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .game-stage {
-    min-height: auto;
-  }
-
-  .battle-stage {
-    grid-template-columns: 1fr;
-  }
-
-  .battle-overlay {
-    left: 0;
-  }
-
-  .battle-overlay-panel {
-    grid-template-rows: auto minmax(0, 1fr);
-    padding: 18px;
-  }
-
-  .battle-topbar {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
-  }
-
-  .battle-topbar-side,
-  .battle-topbar-side.player {
-    justify-items: center;
-    text-align: center;
-  }
-
-  .battle-progress-label {
-    font-size: 24px;
-  }
-
-  .battle-summary-text {
-    max-width: none;
-  }
-
-  .battle-arena {
-    padding: 22px 16px;
-  }
-}
-
-@media (max-height: 760px) {
-  body {
-    overflow: auto;
-  }
-
-  .game-shell {
-    height: auto;
-    min-height: calc(100vh - 24px);
-    overflow: visible;
-  }
-
-  .prep-panel {
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: 10px;
-    padding-top: 10px;
-    padding-bottom: 0;
-  }
-
-  .prep-shared-body {
-    grid-template-rows: minmax(144px, auto) minmax(144px, 1fr) 140px;
-    padding: 8px 8px 0;
-  }
-
-  .prep-shared-body .prep-shop-zone {
-    min-height: 148px;
-    padding-bottom: 8px;
-  }
-
-  .prep-shared-body .prep-board-zone {
-    padding-top: 6px;
-    padding-bottom: 10px;
-  }
-
-  .prep-shared-body .prep-hand-zone {
-    padding-bottom: 4px;
-  }
-
-  .hand-row {
-    min-height: 92px;
-  }
-
-  .hand-row .minion-card {
-    --fan-lift: 12px;
-    min-height: 170px;
-  }
-
-  .prep-hand-zone:hover .hand-row .minion-card,
-  .prep-hand-zone.drop-target .hand-row .minion-card,
-  .prep-hand-zone:focus-within .hand-row .minion-card,
-  .hand-row:focus-within .minion-card {
-    transform: translateX(0) translateY(-14px) rotate(0deg) scale(1);
-  }
-
-  .hand-row .minion-card:hover,
-  .hand-row .minion-card:focus-within,
-  .hand-row .minion-card.drag-source {
-    transform: translateX(0) translateY(-18px) rotate(0deg) scale(1.03);
-  }
-
-  .hand-tray-hotspot {
-    bottom: -12px;
-    width: min(560px, calc(100% - 16px));
-    height: 88px;
-  }
-
-  .prep-hand-zone::after {
-    bottom: 3px;
-  }
-
-  .battle-overlay-panel {
-    gap: 12px;
-    padding: 8px 12px 12px;
-  }
-
-  .battle-topbar {
-    padding: 10px 14px;
-  }
-
-  .battle-topbar-name {
-    font-size: 20px;
-  }
-
-  .battle-progress-label {
-    font-size: 22px;
-  }
-
-  .battle-arena {
-    padding: 16px 14px 24px;
-  }
-
-  .battle-side .battle-board {
-    min-height: 152px;
-  }
-}

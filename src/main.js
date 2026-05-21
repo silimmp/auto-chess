@@ -18,6 +18,8 @@ function startGameApp() {
   const prepZones = createPrepZones(elements);
   const state = createInitialState(generateShop, generateEnemyBoard, pickRandom, randomInt);
 
+  syncAppScale();
+
   elements.refreshBtn?.addEventListener("click", refreshShop);
   elements.upgradeBtn?.addEventListener("click", upgradeTavern);
   elements.freezeBtn?.addEventListener("click", toggleFreezeShop);
@@ -30,6 +32,7 @@ function startGameApp() {
   window.addEventListener("pointerup", handleGlobalPointerUp);
   window.addEventListener("pointercancel", cancelDragInteraction);
   window.addEventListener("blur", cancelDragInteraction);
+  window.addEventListener("resize", syncAppScale);
 
   configureDragRuntime({
     actions: {
@@ -114,6 +117,54 @@ function startGameApp() {
       currentZone: "",
       currentIndex: -1,
     };
+  }
+
+  function syncAppScale() {
+    const root = document.documentElement;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const safeHorizontal = 24;
+    const safeVertical = 24;
+    const shellWidth = Math.max(1, viewportWidth - safeHorizontal);
+    const shellHeight = Math.max(1, viewportHeight - safeVertical);
+    root.style.setProperty("--app-shell-width", `${shellWidth}px`);
+    root.style.setProperty("--app-shell-height", `${shellHeight}px`);
+    root.style.setProperty("--app-scale", "1");
+
+    const frame = document.querySelector(".game-shell-frame");
+    const shell = document.querySelector(".game-shell");
+    const prepPanel = document.querySelector(".prep-panel");
+    const handZone = document.querySelector(".prep-hand-zone");
+    const handBoard = document.querySelector("#hand-board");
+    const handCard = document.querySelector("#hand-board .minion-card");
+    if (!frame || !shell || !prepPanel || !handZone || !handBoard) {
+      return;
+    }
+
+    const frameRect = frame.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    const prepRect = prepPanel.getBoundingClientRect();
+    const handRect = handZone.getBoundingClientRect();
+    const handBoardRect = handBoard.getBoundingClientRect();
+    const handCardRect = handCard?.getBoundingClientRect() || null;
+    const contentWidth = Math.max(
+      shellRect.width,
+      prepRect.right - shellRect.left,
+      handRect.right - shellRect.left,
+      handBoardRect.right - shellRect.left,
+      handCardRect ? handCardRect.right - shellRect.left : 0
+    );
+    const contentHeight = Math.max(
+      shellRect.height,
+      prepRect.bottom - shellRect.top,
+      handRect.bottom - shellRect.top,
+      handBoardRect.bottom - shellRect.top,
+      handCardRect ? handCardRect.bottom - shellRect.top : 0
+    );
+    const widthScale = frameRect.width / Math.max(1, contentWidth);
+    const heightScale = frameRect.height / Math.max(1, contentHeight);
+    const scale = Math.min(1, widthScale, heightScale);
+    root.style.setProperty("--app-scale", String(Math.max(0.1, scale)));
   }
 
   function resetGame() {
