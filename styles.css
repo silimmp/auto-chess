@@ -21,11 +21,76 @@
   --shadow: 0 22px 44px rgba(0, 0, 0, 0.3);
   --shadow-soft: 0 12px 24px rgba(0, 0, 0, 0.16);
   --card-width: 118px;
-  --hud-width: 220px;
-  --countdown-width: 148px;
-  --countdown-safe-gap: 176px;
-  --shell-gap: 16px;
-  --shell-padding: 16px;
+  --layout-axis-x: 1;
+  --layout-axis-y: 1;
+  --hud-width-base: 220px;
+  --countdown-width-base: 148px;
+  --countdown-safe-gap-base: 176px;
+  --shell-gap-base: 16px;
+  --shell-padding-x-base: 16px;
+  --shell-padding-y-base: 16px;
+  --hud-column-gap-base: 14px;
+  --hud-panel-padding-base: 14px;
+  --panel-padding-x-base: 20px;
+  --panel-padding-y-base: 20px;
+  --prep-zone-padding-base: 14px;
+  --prep-zone-gap-base: 10px;
+  --prep-shared-padding-x-base: 10px;
+  --prep-shared-padding-top-base: 8px;
+  --prep-shared-board-min-base: 150px;
+  --prep-shared-hand-min-base: 178px;
+  --prep-shared-shop-pad-bottom-base: 10px;
+  --prep-shared-board-pad-top-base: 6px;
+  --prep-shared-board-pad-bottom-base: 6px;
+  --prep-shared-hand-pad-bottom-base: 6px;
+  --shop-toolbar-gap-base: 14px;
+  --shop-toolbar-min-height-base: 72px;
+  --shop-title-gap-base: 10px;
+  --top-actions-gap-base: 8px;
+  --action-padding-x-base: 15px;
+  --action-padding-y-base: 11px;
+  --hand-row-min-height-base: 104px;
+  --hand-hotspot-bottom-base: -12px;
+  --hand-hotspot-height-base: 98px;
+  --hand-zone-lift-base: 10px;
+  --hand-hotspot-hover-lift-base: -4px;
+  --hand-card-fan-lift-base: 12px;
+  --hand-card-expand-lift-base: -12px;
+  --hand-card-hover-lift-base: -16px;
+  --hud-width: calc(var(--hud-width-base) * var(--layout-axis-x));
+  --countdown-width: calc(var(--countdown-width-base) * var(--layout-axis-x));
+  --countdown-safe-gap: calc(var(--countdown-safe-gap-base) * var(--layout-axis-x));
+  --shell-gap: calc(var(--shell-gap-base) * var(--layout-axis-x));
+  --shell-padding-x: calc(var(--shell-padding-x-base) * var(--layout-axis-x));
+  --shell-padding-y: calc(var(--shell-padding-y-base) * var(--layout-axis-y));
+  --hud-column-gap: calc(var(--hud-column-gap-base) * var(--layout-axis-y));
+  --hud-panel-padding: calc(var(--hud-panel-padding-base) * var(--layout-axis-y));
+  --panel-padding-x: calc(var(--panel-padding-x-base) * var(--layout-axis-x));
+  --panel-padding-y: calc(var(--panel-padding-y-base) * var(--layout-axis-y));
+  --prep-zone-padding: calc(var(--prep-zone-padding-base) * var(--layout-axis-y));
+  --prep-zone-gap: calc(var(--prep-zone-gap-base) * var(--layout-axis-y));
+  --prep-shared-padding-x: calc(var(--prep-shared-padding-x-base) * var(--layout-axis-x));
+  --prep-shared-padding-top: calc(var(--prep-shared-padding-top-base) * var(--layout-axis-y));
+  --prep-shared-board-min: calc(var(--prep-shared-board-min-base) * var(--layout-axis-y));
+  --prep-shared-hand-min: calc(var(--prep-shared-hand-min-base) * var(--layout-axis-y));
+  --prep-shared-shop-pad-bottom: calc(var(--prep-shared-shop-pad-bottom-base) * var(--layout-axis-y));
+  --prep-shared-board-pad-top: calc(var(--prep-shared-board-pad-top-base) * var(--layout-axis-y));
+  --prep-shared-board-pad-bottom: calc(var(--prep-shared-board-pad-bottom-base) * var(--layout-axis-y));
+  --prep-shared-hand-pad-bottom: calc(var(--prep-shared-hand-pad-bottom-base) * var(--layout-axis-y));
+  --shop-toolbar-gap: calc(var(--shop-toolbar-gap-base) * var(--layout-axis-x));
+  --shop-toolbar-min-height: calc(var(--shop-toolbar-min-height-base) * var(--layout-axis-y));
+  --shop-title-gap: calc(var(--shop-title-gap-base) * var(--layout-axis-x));
+  --top-actions-gap: calc(var(--top-actions-gap-base) * var(--layout-axis-x));
+  --action-padding-x: calc(var(--action-padding-x-base) * var(--layout-axis-x));
+  --action-padding-y: calc(var(--action-padding-y-base) * var(--layout-axis-y));
+  --hand-row-min-height: calc(var(--hand-row-min-height-base) * var(--layout-axis-y));
+  --hand-hotspot-bottom: calc(var(--hand-hotspot-bottom-base) * var(--layout-axis-y));
+  --hand-hotspot-height: calc(var(--hand-hotspot-height-base) * var(--layout-axis-y));
+  --hand-zone-lift: calc(var(--hand-zone-lift-base) * var(--layout-axis-y));
+  --hand-hotspot-hover-lift: calc(var(--hand-hotspot-hover-lift-base) * var(--layout-axis-y));
+  --hand-card-fan-lift: calc(var(--hand-card-fan-lift-base) * var(--layout-axis-y));
+  --hand-card-expand-lift: calc(var(--hand-card-expand-lift-base) * var(--layout-axis-y));
+  --hand-card-hover-lift: calc(var(--hand-card-hover-lift-base) * var(--layout-axis-y));
   --app-scale: 1;
   --app-shell-width: calc(100vw - 24px);
   --app-shell-height: calc(100vh - 24px);
@@ -108,7 +173,7 @@ body::after {
   width: 100%;
   height: 100%;
   margin: 0;
-  padding: var(--shell-padding);
+  padding: var(--shell-padding-y) var(--shell-padding-x);
   border-radius: 34px;
   background:
     radial-gradient(circle at top, rgba(255, 208, 126, 0.16), transparent 32%),
@@ -155,7 +220,7 @@ body::after {
 .hud-column {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 14px;
+  gap: var(--hud-column-gap);
 }
 
 .hud-panel,
@@ -173,7 +238,7 @@ body::after {
 
 .hud-panel {
   position: relative;
-  padding: 14px;
+  padding: var(--hud-panel-padding);
   background:
     linear-gradient(180deg, rgba(255, 250, 237, 0.98), rgba(237, 219, 182, 0.94)),
     linear-gradient(135deg, rgba(221, 168, 79, 0.14), rgba(0, 0, 0, 0));
@@ -191,7 +256,7 @@ body::after {
 
 .panel {
   position: relative;
-  padding: 20px;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
   background:
     linear-gradient(180deg, rgba(252, 242, 219, 0.95), rgba(231, 214, 185, 0.93)),
     linear-gradient(140deg, rgba(221, 168, 79, 0.1), rgba(0, 0, 0, 0));
@@ -429,7 +494,7 @@ body::after {
   min-height: 0;
   display: grid;
   position: relative;
-  padding: 14px;
+  padding: var(--prep-zone-padding);
   border-radius: 22px;
   border: 1px solid rgba(119, 74, 36, 0.18);
   background:
@@ -440,22 +505,15 @@ body::after {
 }
 
 .prep-zone.drop-target {
-  background:
-    linear-gradient(180deg, rgba(255, 220, 145, 0.22), rgba(255, 247, 228, 0.5)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
   box-shadow:
     inset 0 0 0 1px rgba(166, 111, 29, 0.24),
-    0 12px 20px rgba(145, 95, 33, 0.14);
-  transform: translateY(-1px);
+    inset 0 0 0 4px rgba(255, 216, 146, 0.12);
 }
 
 .prep-shared-zone.touch-target-ready .prep-board-zone {
-  background:
-    radial-gradient(circle at 50% 38%, rgba(255, 211, 118, 0.22), transparent 42%),
-    linear-gradient(180deg, rgba(255, 241, 207, 0.5), rgba(255, 252, 240, 0.26));
   box-shadow:
     inset 0 0 0 1px rgba(180, 122, 37, 0.22),
-    0 12px 20px rgba(145, 95, 33, 0.08);
+    inset 0 0 0 4px rgba(255, 219, 153, 0.1);
 }
 
 .prep-shared-zone.touch-target-ready .prep-board-zone::after {
@@ -483,7 +541,7 @@ body::after {
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--prep-zone-gap);
   min-width: 0;
   min-height: 100%;
   background:
@@ -499,7 +557,7 @@ body::after {
   min-height: 0;
   min-width: 0;
   height: 100%;
-  padding: 8px 10px 0;
+  padding: var(--prep-shared-padding-top) var(--prep-shared-padding-x) 0;
   border-radius: 28px;
   border: 1px solid rgba(124, 93, 70, 0.08);
   background:
@@ -507,7 +565,7 @@ body::after {
     rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1px 0 rgba(255, 252, 241, 0.16);
   overflow: visible;
-  grid-template-rows: auto minmax(150px, 1fr) minmax(178px, auto);
+  grid-template-rows: auto minmax(var(--prep-shared-board-min), 1fr) minmax(var(--prep-shared-hand-min), auto);
 }
 
 .prep-shared-body::before {
@@ -557,18 +615,18 @@ body::after {
 
 .prep-shared-body .prep-shop-zone {
   padding-top: 2px;
-  padding-bottom: 10px;
+  padding-bottom: var(--prep-shared-shop-pad-bottom);
 }
 
 .prep-shared-body .prep-board-zone {
-  padding-top: 6px;
-  padding-bottom: 6px;
+  padding-top: var(--prep-shared-board-pad-top);
+  padding-bottom: var(--prep-shared-board-pad-bottom);
 }
 
 .prep-shared-body .prep-hand-zone {
   margin-top: 0;
   padding-top: 0;
-  padding-bottom: 6px;
+  padding-bottom: var(--prep-shared-hand-pad-bottom);
 }
 
 .shop-toolbar,
@@ -584,9 +642,9 @@ body::after {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 14px;
+  gap: var(--shop-toolbar-gap);
   margin-bottom: 0;
-  min-height: 72px;
+  min-height: var(--shop-toolbar-min-height);
   padding-bottom: 6px;
 }
 
@@ -599,7 +657,7 @@ body::after {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--shop-title-gap);
   flex: 1 1 auto;
   min-width: 0;
   padding-right: var(--countdown-safe-gap);
@@ -677,7 +735,7 @@ body::after {
 .top-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--top-actions-gap);
   flex-wrap: wrap;
   justify-self: end;
   align-self: start;
@@ -715,7 +773,7 @@ body::after {
   position: relative;
   border: 1px solid rgba(255, 225, 173, 0.16);
   border-radius: 15px;
-  padding: 11px 15px;
+  padding: var(--action-padding-y) var(--action-padding-x);
   font-size: 13px;
   font-weight: 700;
   color: #fff8ee;
@@ -805,7 +863,7 @@ body::after {
 
 .hand-row {
   position: relative;
-  min-height: 104px;
+  min-height: var(--hand-row-min-height);
   padding: 0 10px 0;
   align-items: end;
   justify-content: center;
@@ -819,9 +877,9 @@ body::after {
 .hand-tray-hotspot {
   position: absolute;
   left: 50%;
-  bottom: -12px;
+  bottom: var(--hand-hotspot-bottom);
   width: min(620px, calc(100% - 20px));
-  height: 98px;
+  height: var(--hand-hotspot-height);
   transform: translateX(-50%);
   border-radius: 50% 50% 0 0;
   background:
@@ -852,20 +910,23 @@ body::after {
 .prep-hand-zone:hover .hand-row,
 .prep-hand-zone.drop-target .hand-row,
 .prep-hand-zone:focus-within .hand-row,
+.prep-hand-zone.drag-active .hand-row,
 .hand-row:focus-within {
-  transform: translateY(-10px);
+  transform: translateY(calc(-1 * var(--hand-zone-lift)));
 }
 
 .prep-hand-zone:hover .hand-tray-hotspot,
 .prep-hand-zone:focus-within .hand-tray-hotspot,
+.prep-hand-zone.drag-active .hand-tray-hotspot,
 .prep-hand-zone.drop-target .hand-tray-hotspot {
   opacity: 1;
-  transform: translateX(-50%) translateY(-4px);
+  transform: translateX(-50%) translateY(var(--hand-hotspot-hover-lift));
   filter: saturate(1.06);
 }
 
 .prep-hand-zone:hover::after,
 .prep-hand-zone:focus-within::after,
+.prep-hand-zone.drag-active::after,
 .prep-hand-zone.drop-target::after {
   transform: translateX(-50%) translateY(-4px);
   color: rgba(84, 61, 55, 0.68);
@@ -976,7 +1037,7 @@ body::after {
 .hand-row .minion-card {
   --fan-offset: 0px;
   --fan-rotate: 0deg;
-  --fan-lift: 12px;
+  --fan-lift: var(--hand-card-fan-lift);
   flex: 0 0 auto;
   min-height: 170px;
   margin-left: -52px;
@@ -998,16 +1059,17 @@ body::after {
 .prep-hand-zone:hover .hand-row .minion-card,
 .prep-hand-zone.drop-target .hand-row .minion-card,
 .prep-hand-zone:focus-within .hand-row .minion-card,
+.prep-hand-zone.drag-active .hand-row .minion-card,
 .hand-row:focus-within .minion-card {
   margin-left: -14px;
-  transform: translateX(0) translateY(-12px) rotate(0deg) scale(1);
+  transform: translateX(0) translateY(var(--hand-card-expand-lift)) rotate(0deg) scale(1);
 }
 
 .hand-row .minion-card:hover,
 .hand-row .minion-card:focus-within,
 .hand-row .minion-card.drag-source {
   z-index: 32;
-  transform: translateX(0) translateY(-16px) rotate(0deg) scale(1.03);
+  transform: translateX(0) translateY(var(--hand-card-hover-lift)) rotate(0deg) scale(1.03);
 }
 
 .hand-row[data-hand-count="1"] .minion-card {
@@ -1162,9 +1224,53 @@ body::after {
   cursor: grabbing;
 }
 
+.drag-preview {
+  position: fixed;
+  z-index: 9999;
+  margin: 0;
+  pointer-events: none;
+  transform: rotate(-1deg) scale(1.04);
+  box-shadow: 0 20px 36px rgba(58, 33, 14, 0.22);
+  transition: none !important;
+  will-change: transform;
+}
+
+.drag-preview .card-actions {
+  display: none;
+}
+
+/* Freeze zone/card transitions during dragging so the preview is the only moving element. */
+.dragging-card .prep-zone,
+.dragging-card .hand-row,
+.dragging-card .hand-tray-hotspot,
+.dragging-card .prep-hand-zone::after,
+.dragging-card .hand-row .minion-card,
+.dragging-card .minion-info-overlay {
+  transition: none !important;
+}
+
+.dragging-card .shop-row .minion-card:hover,
+.dragging-card .hand-row .minion-card:hover,
+.dragging-card .board-row .minion-card:hover,
+.dragging-card .hand-row .minion-card:focus-within,
+.dragging-card .minion-main:has(.card-info-toggle:hover) .minion-info-overlay,
+.dragging-card .minion-main:has(.card-info-toggle:focus) .minion-info-overlay,
+.dragging-card .minion-main:has(.minion-info-overlay:hover) .minion-info-overlay,
+.dragging-card .minion-card:focus-within .minion-info-overlay {
+  transform: none;
+  box-shadow: inherit;
+  filter: none;
+}
+
 .minion-card.drag-source {
-  opacity: 0.16;
-  filter: saturate(0.7);
+  opacity: 0;
+  filter: none;
+  transition: none !important;
+}
+
+.prep-hand-zone.drag-active .hand-row .minion-card.drag-source {
+  margin-left: -14px;
+  transform: translateX(0) translateY(var(--hand-card-expand-lift)) rotate(0deg) scale(1);
 }
 
 .minion-card.touch-press-armed {
@@ -1181,19 +1287,6 @@ body::after {
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     0 20px 32px rgba(74, 44, 13, 0.24),
     0 0 0 3px rgba(219, 167, 65, 0.34);
-}
-
-.drag-preview {
-  position: fixed;
-  z-index: 9999;
-  margin: 0;
-  pointer-events: none;
-  transform: rotate(-1deg) scale(1.04);
-  box-shadow: 0 20px 36px rgba(58, 33, 14, 0.22);
-}
-
-.drag-preview .card-actions {
-  display: none;
 }
 
 .minion-card > * {

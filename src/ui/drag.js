@@ -17,19 +17,45 @@ function createDragState() {
     currentZone: "",
     currentIndex: -1,
     currentSlotLabel: "",
+    cachedRects: null,
+    dragRect: null,
+    frameRequested: false,
+  };
+}
+
+function snapshotRect(rect) {
+  if (!rect) {
+    return null;
+  }
+  // Copy the live DOMRect into a plain object so drag hit-testing stays stable between frames.
+  return {
+    left: rect.left,
+    top: rect.top,
+    right: rect.right,
+    bottom: rect.bottom,
+    width: rect.width,
+    height: rect.height,
   };
 }
 
 function bindPrepCardInteractions(card, zone, index, disabled) {
   card.dataset.zone = zone;
   card.dataset.index = String(index);
-  if (disabled) {
+  const shouldEnable = !disabled;
+  if (shouldEnable) {
+    card.classList.add("draggable-card");
+  } else {
+    card.classList.remove("draggable-card");
+  }
+  if (card.__prepPointerBound) {
     return;
   }
-
-  card.classList.add("draggable-card");
+  card.__prepPointerBound = true;
   card.addEventListener("pointerdown", (event) => {
-    beginCardDragPress(event, zone, index, card);
+    if (!card.classList.contains("draggable-card")) {
+      return;
+    }
+    beginCardDragPress(event, card.dataset.zone, Number(card.dataset.index), card);
   });
 }
 
@@ -101,8 +127,7 @@ function handleGlobalPointerMove(event) {
   }
 
   event.preventDefault();
-  updateDragPreviewPosition(event.clientX, event.clientY);
-  updateDropTargetState(event.clientX, event.clientY);
+  requestDragFrame();
 }
 
 function requiresLongPressDrag(pointerType) {
@@ -112,6 +137,12 @@ function requiresLongPressDrag(pointerType) {
 function handleGlobalPointerUp(event) {
   if (dragRuntime.dragState.status === "idle" || event.pointerId !== dragRuntime.dragState.pointerId) {
     return;
+  }
+
+  if (dragRuntime.dragState.status === "active") {
+    dragRuntime.dragState.pointerX = event.clientX;
+    dragRuntime.dragState.pointerY = event.clientY;
+    flushDragFrame();
   }
 
   const wasPending = dragRuntime.dragState.status === "pending";
@@ -162,23 +193,28 @@ function activateDrag() {
   preview.classList.add("drag-preview");
   preview.style.width = `${rect.width}px`;
   preview.style.height = `${rect.height}px`;
-  preview.style.left = `${rect.left}px`;
-  preview.style.top = `${rect.top}px`;
+  preview.style.left = "0";
+  preview.style.top = "0";
+  preview.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0) rotate(-1deg) scale(1.04)`;
   document.body.appendChild(preview);
 
   dragRuntime.dragState.status = "active";
   dragRuntime.dragState.previewElement = preview;
   dragRuntime.dragState.offsetX = dragRuntime.dragState.startX - rect.left;
   dragRuntime.dragState.offsetY = dragRuntime.dragState.startY - rect.top;
+  dragRuntime.dragState.dragRect = snapshotRect(rect);
   dragRuntime.dragState.sourceElement.classList.remove("touch-press-armed");
   dragRuntime.dragState.sourceElement.classList.add("drag-source");
   document.body.classList.add("dragging-card");
   if (requiresLongPressDrag(dragRuntime.dragState.pointerType)) {
     document.body.classList.add("touch-drag-active");
   }
+  if (dragRuntime.dragState.sourceZone === "hand") {
+    dragRuntime.prepZones.hand?.classList.add("drag-active");
+  }
+  dragRuntime.dragState.cachedRects = collectDragRects();
 
-  updateDragPreviewPosition(dragRuntime.dragState.pointerX, dragRuntime.dragState.pointerY);
-  updateDropTargetState(dragRuntime.dragState.pointerX, dragRuntime.dragState.pointerY);
+  flushDragFrame();
 }
 
 function updateDragPreviewPosition(clientX, clientY) {
@@ -186,18 +222,26 @@ function updateDragPreviewPosition(clientX, clientY) {
     return;
   }
 
-  dragRuntime.dragState.previewElement.style.left = `${clientX - dragRuntime.dragState.offsetX}px`;
-  dragRuntime.dragState.previewElement.style.top = `${clientY - dragRuntime.dragState.offsetY}px`;
+  const x = clientX - dragRuntime.dragState.offsetX;
+  const y = clientY - dragRuntime.dragState.offsetY;
+  dragRuntime.dragState.previewElement.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(-1deg) scale(1.04)`;
 }
 
 function updateDropTargetState(clientX, clientY) {
   const hoveredZone = getPriorityDropZone(clientX, clientY);
   const zone = isValidDropZone(dragRuntime.dragState.sourceZone, hoveredZone) ? hoveredZone : "";
-  const index = zone === "hand" || zone === "board" ? getDropIndex(zone, clientX) : -1;
+  const index =
+    dragRuntime.dragState.sourceZone === "shop" ? -1 : zone === "hand" || zone === "board" ? getDropIndex(zone, clientX) : -1;
+  const zoneChanged = dragRuntime.dragState.currentZone !== zone;
+  const indexChanged = dragRuntime.dragState.currentIndex !== index;
 
   dragRuntime.dragState.currentZone = zone;
   dragRuntime.dragState.currentIndex = index;
   dragRuntime.dragState.currentSlotLabel = zone === "board" && index >= 0 ? `将放在第 ${index + 1} 位` : "";
+
+  if (!zoneChanged && !indexChanged) {
+    return;
+  }
 
   Object.entries(dragRuntime.prepZones).forEach(([key, element]) => {
     if (key === "shared") {
@@ -221,7 +265,7 @@ function updateDropTargetState(clientX, clientY) {
 function getShopPurchaseZone() {
   const pointerZone = getDropZoneAtPoint(dragRuntime.dragState.pointerX, dragRuntime.dragState.pointerY);
   if (pointerZone === "hand" || pointerZone === "board") {
-    return "hand";
+    return pointerZone;
   }
 
   const dragRect = getActiveDragRect();
@@ -229,21 +273,21 @@ function getShopPurchaseZone() {
     return "";
   }
 
-  const handRatio = getOverlapRatio(dragRect, dragRuntime.prepZones.hand?.getBoundingClientRect());
-  const boardRatio = getOverlapRatio(dragRect, dragRuntime.prepZones.board?.getBoundingClientRect());
+  const handRatio = getOverlapRatio(dragRect, getZoneRect("hand"));
+  const boardRatio = getOverlapRatio(dragRect, getZoneRect("board"));
 
-  if (handRatio >= 0.28 || boardRatio >= 0.28) {
+  if (boardRatio >= 0.28) {
+    return "board";
+  }
+  if (handRatio >= 0.28) {
     return "hand";
   }
   return "";
 }
 
 function getActiveDragRect() {
-  if (dragRuntime.dragState.previewElement) {
-    return dragRuntime.dragState.previewElement.getBoundingClientRect();
-  }
-  if (dragRuntime.dragState.sourceElement?.isConnected) {
-    return dragRuntime.dragState.sourceElement.getBoundingClientRect();
+  if (dragRuntime.dragState.dragRect) {
+    return dragRuntime.dragState.dragRect;
   }
   return null;
 }
@@ -297,8 +341,8 @@ function getHandDeployZone(clientX, clientY) {
   }
 
   const dragRect = getActiveDragRect();
-  const handRect = dragRuntime.prepZones.hand?.getBoundingClientRect();
-  const boardRect = dragRuntime.prepZones.board?.getBoundingClientRect();
+  const handRect = getZoneRect("hand");
+  const boardRect = getZoneRect("board");
   if (!dragRect || !handRect) {
     return pointerZone || "";
   }
@@ -315,7 +359,7 @@ function getHandDeployZone(clientX, clientY) {
 
 function isSellDropActive() {
   const dragRect = getActiveDragRect();
-  const prepPanelRect = dragRuntime.elements.prepPanel?.getBoundingClientRect();
+  const prepPanelRect = dragRuntime.dragState.cachedRects?.prepPanel || dragRuntime.elements.prepPanel?.getBoundingClientRect();
   if (!dragRect || !prepPanelRect) {
     return false;
   }
@@ -328,7 +372,7 @@ function isValidDropZone(sourceZone, targetZone) {
     return false;
   }
   if (sourceZone === "shop") {
-    return targetZone === "hand";
+    return targetZone === "hand" || targetZone === "board";
   }
   if (sourceZone === "hand") {
     return targetZone === "hand" || targetZone === "board" || targetZone === "sell";
@@ -342,12 +386,11 @@ function isValidDropZone(sourceZone, targetZone) {
 function getDropZoneAtPoint(clientX, clientY) {
   const orderedZones = ["shop", "board", "hand", "shared"];
   for (const zone of orderedZones) {
-    const element = dragRuntime.prepZones[zone];
-    if (!element) {
+    const rect = getZoneRect(zone);
+    if (!rect) {
       continue;
     }
 
-    const rect = element.getBoundingClientRect();
     if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
       return zone;
     }
@@ -356,16 +399,15 @@ function getDropZoneAtPoint(clientX, clientY) {
 }
 
 function getDropIndex(zone, clientX) {
-  const container = getZoneElement(zone);
-  if (!container) {
+  const cards = getCachedCardRects(zone);
+  if (!cards) {
     return -1;
   }
 
-  const cards = [...container.querySelectorAll(".minion-card:not(.drag-source)")];
   const dragRect = getActiveDragRect();
   const probeX = dragRect ? dragRect.left + dragRect.width / 2 : clientX;
   for (let index = 0; index < cards.length; index += 1) {
-    const rect = cards[index].getBoundingClientRect();
+    const rect = cards[index];
     if (probeX < rect.left + rect.width / 2) {
       return index;
     }
@@ -392,7 +434,7 @@ function applyCardDrop({ sourceZone, sourceIndex, targetZone, targetIndex }) {
   }
 
   if (sourceZone === "shop") {
-    if (targetZone === "hand") {
+    if (targetZone === "hand" || targetZone === "board") {
       dragRuntime.actions.buyMinion(sourceIndex);
     }
     return;
@@ -428,6 +470,7 @@ function cleanupDragState() {
   if (dragRuntime.dragState.timerId) {
     window.clearTimeout(dragRuntime.dragState.timerId);
   }
+  dragRuntime.dragState.frameRequested = false;
 
   if (dragRuntime.dragState.pointerId !== null) {
     try {
@@ -446,6 +489,9 @@ function cleanupDragState() {
       return;
     }
     element?.classList.remove("drop-target");
+    if (key === "hand") {
+      element?.classList.remove("drag-active");
+    }
     if (key === "board") {
       element?.style.removeProperty("--drop-slot-index");
       element?.style.removeProperty("--drop-slot-label");
@@ -456,6 +502,69 @@ function cleanupDragState() {
   document.body.classList.remove("touch-drag-active");
   document.body.classList.remove("touch-press-mode");
   dragRuntime.setDragState(createDragState());
+}
+
+function requestDragFrame() {
+  if (dragRuntime.dragState.frameRequested) {
+    return;
+  }
+  dragRuntime.dragState.frameRequested = true;
+  window.requestAnimationFrame(() => {
+    if (dragRuntime.dragState.status !== "active") {
+      dragRuntime.dragState.frameRequested = false;
+      return;
+    }
+    flushDragFrame();
+  });
+}
+
+function flushDragFrame() {
+  dragRuntime.dragState.frameRequested = false;
+  if (dragRuntime.dragState.previewElement) {
+    const left = dragRuntime.dragState.pointerX - dragRuntime.dragState.offsetX;
+    const top = dragRuntime.dragState.pointerY - dragRuntime.dragState.offsetY;
+    const { width, height } = dragRuntime.dragState.dragRect;
+    // Rebuild the preview rect from pointer coordinates to avoid layout reads in the hot path.
+    dragRuntime.dragState.dragRect = {
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+      width,
+      height,
+    };
+  }
+  updateDragPreviewPosition(dragRuntime.dragState.pointerX, dragRuntime.dragState.pointerY);
+  updateDropTargetState(dragRuntime.dragState.pointerX, dragRuntime.dragState.pointerY);
+}
+
+function collectDragRects() {
+  return {
+    prepPanel: dragRuntime.elements.prepPanel?.getBoundingClientRect() || null,
+    zones: Object.fromEntries(
+      Object.entries(dragRuntime.prepZones).map(([key, element]) => [key, element?.getBoundingClientRect() || null])
+    ),
+    cards: {
+      hand: collectZoneCardRects("hand"),
+      board: collectZoneCardRects("board"),
+    },
+  };
+}
+
+function collectZoneCardRects(zone) {
+  const container = getZoneElement(zone);
+  if (!container) {
+    return [];
+  }
+  return [...container.querySelectorAll(".minion-card:not(.drag-source)")].map((card) => snapshotRect(card.getBoundingClientRect()));
+}
+
+function getZoneRect(zone) {
+  return dragRuntime.dragState.cachedRects?.zones?.[zone] || dragRuntime.prepZones[zone]?.getBoundingClientRect() || null;
+}
+
+function getCachedCardRects(zone) {
+  return dragRuntime.dragState.cachedRects?.cards?.[zone] || collectZoneCardRects(zone);
 }
 
 function cancelDragInteraction() {

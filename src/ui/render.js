@@ -10,6 +10,7 @@ function renderGame({
 }) {
   const { skipZoneRenders = false } = options;
   const isPrep = state.phase === "prep";
+  const shouldRenderBattleBoards = !skipZoneRenders && state.phase === "battle";
   if (!isPrep && dragState.status !== "idle") {
     cleanupDragState();
   }
@@ -37,11 +38,98 @@ function renderGame({
     renderPlayerBoard(state, elements, bindPrepCardInteractions);
   }
 
-  if (!skipZoneRenders) {
+  if (shouldRenderBattleBoards) {
     renderBattleBoards(state, elements);
   }
   syncBattleOverlay(state, elements);
   syncButtons(state, elements);
+}
+
+const prepCardNodeCache = new Map();
+
+function getPrepCardKey(card, zone, index) {
+  if (zone === "shop") {
+    return `shop:${index}:${card.id}:${card.tier}`;
+  }
+  if (card.instanceId !== null && card.instanceId !== undefined) {
+    return `unit:${card.instanceId}`;
+  }
+  return `${zone}:${card.cardKind || "minion"}:${card.id || card.name || "card"}:${card.rewardTier ?? ""}:${index}`;
+}
+
+function getPrepCardSignature(card) {
+  return [
+    card.cardKind || "minion",
+    card.id || "",
+    card.name || "",
+    card.attack ?? "",
+    card.health ?? "",
+    card.golden ? 1 : 0,
+    card.rewardTier ?? "",
+    card.tribe || "",
+    Array.isArray(card.keywords) ? card.keywords.join(",") : "",
+    card.text || "",
+  ].join("|");
+}
+
+function getPrepCardVariant(card, zone) {
+  if (card?.cardKind === "tripleReward") {
+    return zone === "hand" ? "reward-hand" : "reward";
+  }
+  return "minion";
+}
+
+function syncPrepCardNode(node, zone, index, selected, bindPrepCardInteractions, actionsLocked) {
+  node.classList.toggle("touch-selected", selected);
+  bindPrepCardInteractions(node, zone, index, actionsLocked);
+}
+
+function buildPrepCardNode(card, zone) {
+  if (zone === "hand") {
+    return buildHandCard(card, { showActions: false });
+  }
+  return buildMinionCard(card, { showActions: false });
+}
+
+function reconcilePrepZone(container, desiredNodes) {
+  if (!container) {
+    return;
+  }
+
+  let current = container.firstChild;
+  desiredNodes.forEach((node) => {
+    if (node === current) {
+      current = current.nextSibling;
+      return;
+    }
+    container.insertBefore(node, current);
+  });
+
+  while (current) {
+    const next = current.nextSibling;
+    container.removeChild(current);
+    current = next;
+  }
+}
+
+function buildPrepZoneNodes(cards, zone, bindPrepCardInteractions, actionsLocked, selectedIndex = -1) {
+  return cards.map((card, index) => {
+    const key = getPrepCardKey(card, zone, index);
+    const signature = getPrepCardSignature(card);
+    const variant = getPrepCardVariant(card, zone);
+    let node = prepCardNodeCache.get(key);
+
+    if (!node || node.dataset.renderSignature !== signature || node.dataset.renderVariant !== variant) {
+      node = buildPrepCardNode(card, zone);
+      node.dataset.renderKey = key;
+      node.dataset.renderSignature = signature;
+      node.dataset.renderVariant = variant;
+      prepCardNodeCache.set(key, node);
+    }
+
+    syncPrepCardNode(node, zone, index, index === selectedIndex, bindPrepCardInteractions, actionsLocked);
+    return node;
+  });
 }
 
 function syncTouchSelectionState(state, touchSelection, elements) {
@@ -68,8 +156,16 @@ function syncLobbyPanel(state, elements) {
   elements.lobbyAlive.textContent = alivePlayers.length;
   elements.lobbyPlace.textContent = `${getPlayerPlacement(lobbyView)}`;
   elements.lobbyOpponent.textContent = state.currentOpponentName || LOBBY_GHOST_LABEL;
+  const rosterSignature = alivePlayers
+    .slice()
+    .sort((left, right) => right.hp - left.hp)
+    .map((player) => `${player.id}:${player.hp}:${player.alive ? 1 : 0}`)
+    .join("|");
+  const recent = state.lobby.roundSummaries.length ? state.lobby.roundSummaries : ["本轮战斗尚未开始。"];
+  const recentSignature = recent.slice(0, 3).join("|");
 
-  if (elements.lobbyRoster) {
+  if (elements.lobbyRoster && elements.lobbyRoster.dataset.signature !== rosterSignature) {
+    elements.lobbyRoster.dataset.signature = rosterSignature;
     elements.lobbyRoster.innerHTML = "";
     alivePlayers
       .slice()
@@ -83,9 +179,9 @@ function syncLobbyPanel(state, elements) {
       });
   }
 
-  if (elements.lobbyRecent) {
+  if (elements.lobbyRecent && elements.lobbyRecent.dataset.signature !== recentSignature) {
+    elements.lobbyRecent.dataset.signature = recentSignature;
     elements.lobbyRecent.innerHTML = "";
-    const recent = state.lobby.roundSummaries.length ? state.lobby.roundSummaries : ["本轮战斗尚未开始。"];
     recent.slice(0, 3).forEach((line) => {
       const item = document.createElement("div");
       item.className = "lobby-recent-item";
@@ -124,56 +220,37 @@ function formatTierOdds(odds) {
 }
 
 function renderShop(state, elements, bindPrepCardInteractions) {
-  elements.shop.innerHTML = "";
-
+  const actionsLocked = state.phase !== "prep" || state.hp <= 0;
   if (!state.shop.length) {
-    elements.shop.appendChild(makeEmptyCard("商店空了，试试刷新。"));
+    reconcilePrepZone(elements.shop, [makeEmptyCard("商店空了，试试刷新。")]);
     return;
   }
 
-  const actionsLocked = state.phase !== "prep" || state.hp <= 0;
-  state.shop.forEach((minion, index) => {
-    const card = buildMinionCard(minion, { showActions: false });
-    bindPrepCardInteractions(card, "shop", index, actionsLocked);
-    elements.shop.appendChild(card);
-  });
+  reconcilePrepZone(elements.shop, buildPrepZoneNodes(state.shop, "shop", bindPrepCardInteractions, actionsLocked));
 }
 
 function renderHand(state, touchSelection, elements, bindPrepCardInteractions) {
-  elements.hand.innerHTML = "";
   elements.hand.dataset.handCount = String(state.hand.length);
   elements.hand.classList.toggle("is-empty", state.hand.length === 0);
-
+  const actionsLocked = state.phase !== "prep" || state.hp <= 0;
+  const selectedIndex =
+    touchSelection?.active && touchSelection.sourceZone === "hand" && touchSelection.index >= 0 ? touchSelection.index : -1;
   if (!state.hand.length) {
-    elements.hand.appendChild(makeEmptyCard("手牌空空，买下的随从会先放在这里。"));
+    reconcilePrepZone(elements.hand, [makeEmptyCard("手牌空空，买下的随从会先放在这里。")]);
     return;
   }
 
-  const actionsLocked = state.phase !== "prep" || state.hp <= 0;
-  state.hand.forEach((minion, index) => {
-    const card = buildHandCard(minion, { showActions: false });
-    if (touchSelection?.active && touchSelection.sourceZone === "hand" && touchSelection.index === index) {
-      card.classList.add("touch-selected");
-    }
-    bindPrepCardInteractions(card, "hand", index, actionsLocked);
-    elements.hand.appendChild(card);
-  });
+  reconcilePrepZone(elements.hand, buildPrepZoneNodes(state.hand, "hand", bindPrepCardInteractions, actionsLocked, selectedIndex));
 }
 
 function renderPlayerBoard(state, elements, bindPrepCardInteractions) {
-  elements.board.innerHTML = "";
-
+  const actionsLocked = state.phase !== "prep" || state.hp <= 0;
   if (!state.board.length) {
-    elements.board.appendChild(makeEmptyCard("战队还是空的，先招募一些随从。"));
+    reconcilePrepZone(elements.board, [makeEmptyCard("战队还是空的，先招募一些随从。")]);
     return;
   }
 
-  const actionsLocked = state.phase !== "prep" || state.hp <= 0;
-  state.board.forEach((minion, index) => {
-    const card = buildMinionCard(minion, { showActions: false });
-    bindPrepCardInteractions(card, "board", index, actionsLocked);
-    elements.board.appendChild(card);
-  });
+  reconcilePrepZone(elements.board, buildPrepZoneNodes(state.board, "board", bindPrepCardInteractions, actionsLocked));
 }
 
 function renderBattleBoards(state, elements) {

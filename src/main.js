@@ -129,6 +129,8 @@ function startGameApp() {
     const shellHeight = Math.max(1, viewportHeight - safeVertical);
     root.style.setProperty("--app-shell-width", `${shellWidth}px`);
     root.style.setProperty("--app-shell-height", `${shellHeight}px`);
+    root.style.setProperty("--layout-axis-x", "1");
+    root.style.setProperty("--layout-axis-y", "1");
     root.style.setProperty("--app-scale", "1");
 
     const frame = document.querySelector(".game-shell-frame");
@@ -137,42 +139,100 @@ function startGameApp() {
     const handZone = document.querySelector(".prep-hand-zone");
     const handBoard = document.querySelector("#hand-board");
     const handCard = document.querySelector("#hand-board .minion-card");
-    if (!frame || !shell || !prepPanel || !handZone || !handBoard) {
+    const shopZone = document.querySelector(".prep-shop-zone");
+    const shopBoard = document.querySelector("#shop-board");
+    const boardZone = document.querySelector(".prep-board-zone");
+    const hudColumn = document.querySelector(".hud-column");
+    const shopToolbar = document.querySelector(".shop-toolbar");
+    const topActions = document.querySelector(".top-actions");
+    if (!frame || !shell || !prepPanel || !handZone || !handBoard || !shopZone || !shopBoard || !boardZone || !hudColumn || !shopToolbar) {
       return;
     }
 
-    const frameRect = frame.getBoundingClientRect();
-    const shellRect = shell.getBoundingClientRect();
-    const prepRect = prepPanel.getBoundingClientRect();
-    const sharedZone = document.querySelector(".prep-shared-zone");
-    const sharedRect = sharedZone?.getBoundingClientRect() || null;
-    const handRect = handZone.getBoundingClientRect();
-    const boardZone = document.querySelector(".prep-board-zone");
-    const boardRect = boardZone?.getBoundingClientRect() || null;
-    const handBoardRect = handBoard.getBoundingClientRect();
-    const handCardRect = handCard?.getBoundingClientRect() || null;
-    const contentWidth = Math.max(
-      shellRect.width,
-      prepRect.right - shellRect.left,
-      handRect.right - shellRect.left,
-      handBoardRect.right - shellRect.left,
-      handCardRect ? handCardRect.right - shellRect.left : 0
-    );
-    const contentHeight = Math.max(
-      shellRect.height,
-      prepRect.bottom - shellRect.top,
-      sharedRect ? sharedRect.bottom - shellRect.top : 0,
-      sharedRect ? sharedRect.top - shellRect.top : 0,
-      handRect.bottom - shellRect.top,
-      handRect.top - shellRect.top,
-      boardRect ? boardRect.bottom - shellRect.top : 0,
-      boardRect ? boardRect.top - shellRect.top : 0,
-      handBoardRect.bottom - shellRect.top,
-      handBoardRect.top - shellRect.top,
-      handCardRect ? handCardRect.bottom - shellRect.top : 0
-    );
-    const widthScale = frameRect.width / Math.max(1, contentWidth);
-    const heightScale = frameRect.height / Math.max(1, contentHeight);
+    function clampAxis(value, minimum = 0.78) {
+      return Math.max(minimum, Math.min(1, value));
+    }
+
+    function collectLayoutMetrics() {
+      const frameRect = frame.getBoundingClientRect();
+      const shellRect = shell.getBoundingClientRect();
+      const prepRect = prepPanel.getBoundingClientRect();
+      const sharedZone = document.querySelector(".prep-shared-zone");
+      const sharedRect = sharedZone?.getBoundingClientRect() || null;
+      const handRect = handZone.getBoundingClientRect();
+      const boardRect = boardZone.getBoundingClientRect();
+      const shopRect = shopZone.getBoundingClientRect();
+      const shopBoardRect = shopBoard.getBoundingClientRect();
+      const handBoardRect = handBoard.getBoundingClientRect();
+      const handCardRect = handCard?.getBoundingClientRect() || null;
+      const hudRect = hudColumn.getBoundingClientRect();
+      const toolbarRect = shopToolbar.getBoundingClientRect();
+      const topActionsRect = topActions?.getBoundingClientRect() || null;
+
+      const contentWidth = Math.max(
+        shellRect.width,
+        prepRect.right - shellRect.left,
+        handRect.right - shellRect.left,
+        handBoardRect.right - shellRect.left,
+        shopBoardRect.right - shellRect.left,
+        handCardRect ? handCardRect.right - shellRect.left : 0
+      );
+      const contentHeight = Math.max(
+        shellRect.height,
+        prepRect.bottom - shellRect.top,
+        sharedRect ? sharedRect.bottom - shellRect.top : 0,
+        handRect.bottom - shellRect.top,
+        boardRect.bottom - shellRect.top,
+        handBoardRect.bottom - shellRect.top,
+        shopRect.bottom - shellRect.top,
+        shopBoardRect.bottom - shellRect.top,
+        handCardRect ? handCardRect.bottom - shellRect.top : 0
+      );
+
+      const overlapY = Math.max(
+        0,
+        shopRect.bottom - boardRect.top,
+        boardRect.bottom - handRect.top,
+        handCardRect ? handCardRect.top < boardRect.top ? boardRect.top - handCardRect.top : 0 : 0
+      );
+      const hudOverflowY = Math.max(0, hudRect.bottom - frameRect.bottom);
+      const toolbarOverflowX = topActionsRect ? Math.max(0, topActionsRect.right - prepRect.right) : 0;
+
+      return {
+        contentHeight,
+        contentWidth,
+        frameHeight: frameRect.height,
+        frameWidth: frameRect.width,
+        heightOverflow: Math.max(0, contentHeight - frameRect.height),
+        hudOverflowY,
+        overlapY,
+        shellHeight: shellRect.height,
+        shellWidth: shellRect.width,
+        toolbarOverflowX,
+        widthOverflow: Math.max(0, contentWidth - frameRect.width),
+      };
+    }
+
+    let metrics = collectLayoutMetrics();
+    let axisX = 1;
+    let axisY = 1;
+
+    if (metrics.widthOverflow > 0 || metrics.toolbarOverflowX > 0) {
+      const widthPressure = (metrics.widthOverflow + metrics.toolbarOverflowX) / Math.max(1, metrics.frameWidth);
+      axisX = clampAxis(1 - widthPressure * 1.35, 0.8);
+      root.style.setProperty("--layout-axis-x", String(axisX));
+      metrics = collectLayoutMetrics();
+    }
+
+    if (metrics.heightOverflow > 0 || metrics.overlapY > 0 || metrics.hudOverflowY > 0) {
+      const heightPressure = (metrics.heightOverflow + metrics.overlapY + metrics.hudOverflowY) / Math.max(1, metrics.frameHeight);
+      axisY = clampAxis(1 - heightPressure * 1.5, 0.74);
+      root.style.setProperty("--layout-axis-y", String(axisY));
+      metrics = collectLayoutMetrics();
+    }
+
+    const widthScale = metrics.frameWidth / Math.max(1, metrics.contentWidth);
+    const heightScale = metrics.frameHeight / Math.max(1, metrics.contentHeight);
     const scale = Math.min(1, widthScale, heightScale);
     root.style.setProperty("--app-scale", String(Math.max(0.1, scale)));
   }
@@ -399,7 +459,10 @@ function startGameApp() {
     const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
     if (remainingSeconds !== state.timeLeft) {
       state.timeLeft = remainingSeconds;
-      renderStatusOnly();
+      // Keep drag motion uninterrupted; the timer label catches up on the next non-drag frame.
+      if (dragState.status !== "active") {
+        renderStatusOnly();
+      }
     }
     if (remainingMs <= 0) {
       if (state.discover) {

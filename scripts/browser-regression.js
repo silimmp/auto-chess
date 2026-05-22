@@ -288,9 +288,13 @@ async function collectViewportFitMetrics(page) {
     const panelRect = panel.getBoundingClientRect();
     const trayRect = tray.getBoundingClientRect();
     const scale = Number.parseFloat(rootStyles.getPropertyValue("--app-scale")) || 1;
+    const axisX = Number.parseFloat(rootStyles.getPropertyValue("--layout-axis-x")) || 1;
+    const axisY = Number.parseFloat(rootStyles.getPropertyValue("--layout-axis-y")) || 1;
     const shellInnerWidth = shell.offsetWidth;
     const shellInnerHeight = shell.offsetHeight;
     return {
+      axisX: Number(axisX.toFixed(3)),
+      axisY: Number(axisY.toFixed(3)),
       frameBottomOverflow: Math.round(frameRect.bottom - window.innerHeight),
       frameRightOverflow: Math.round(frameRect.right - window.innerWidth),
       panelBottomOverflow: Math.round(panelRect.bottom - frameRect.bottom),
@@ -534,7 +538,7 @@ async function main() {
         assert(viewportMetrics.shellRightOverflow <= 0, "矮视口下主舞台不应超出视口右侧。");
         assert(viewportMetrics.panelBottomOverflow <= 0, "矮视口下准备阶段主框不应被裁切。");
         assert(handMetrics.trayVisibleHeight >= 80, `矮视口下手牌区可见高度不足：${JSON.stringify({ handMetrics, viewportMetrics })}`);
-        assert(viewportMetrics.scale < 1, "矮视口下应触发整体缩放。");
+        assert(viewportMetrics.axisY < 1 || viewportMetrics.scale < 1, "矮视口下应至少触发纵向收缩或整体缩放。");
         return { handMetrics, viewportMetrics };
       })
     );
