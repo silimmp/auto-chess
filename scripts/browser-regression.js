@@ -566,6 +566,56 @@ async function main() {
     );
 
     results.push(
+      await runScenarioWithViewport("desktop-low-height-fit", browser, url, { width: 1280, height: 640 }, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.gold = 0;
+          api.state.shop = [];
+          api.state.board = [];
+          api.state.hand = [api.createOwnedMinion("wandering-swordsman"), api.createOwnedMinion("arena-champion")];
+          api.state.enemyBoard = [];
+          api.render();
+        });
+        await page.waitForTimeout(180);
+
+        const viewportMetrics = await collectViewportFitMetrics(page);
+        const detail = await collectHudAndToolbarMetrics(page);
+        const handMetrics = await page.evaluate(() => {
+          const tray = document.querySelector(".prep-hand-zone");
+          const card = document.querySelector("#hand-board .minion-card");
+          const panel = document.querySelector(".prep-panel");
+          if (!tray || !card || !panel) {
+            return null;
+          }
+          const trayRect = tray.getBoundingClientRect();
+          const cardRect = card.getBoundingClientRect();
+          const panelRect = panel.getBoundingClientRect();
+          return {
+            cardVisibleHeight: Math.round(Math.max(0, Math.min(trayRect.bottom, cardRect.bottom) - Math.max(trayRect.top, cardRect.top))),
+            panelBottomOverflow: Math.round(panelRect.bottom - window.innerHeight),
+            trayVisibleHeight: Math.round(Math.max(0, Math.min(trayRect.bottom, panelRect.bottom) - Math.max(trayRect.top, panelRect.top))),
+          };
+        });
+
+        assert(viewportMetrics, "低高度桌面视口缺少整体适配信息。");
+        assert(detail, "低高度桌面视口缺少 HUD 或工具条关键节点。");
+        assert(handMetrics, "低高度桌面视口缺少手牌区关键节点。");
+        assert(viewportMetrics.frameBottomOverflow <= 0, "低高度桌面视口下缩放框不应超出视口底部。");
+        assert(viewportMetrics.shellBottomOverflow <= 0, "低高度桌面视口下主舞台不应超出视口底部。");
+        assert(viewportMetrics.panelBottomOverflow <= 0, "低高度桌面视口下准备阶段主框不应被裁切。");
+        assert(handMetrics.panelBottomOverflow <= 0, "低高度桌面视口下准备阶段面板不应超出底部。");
+        assert(handMetrics.cardVisibleHeight >= 56, `低高度桌面视口下手牌默认露出高度不足：${JSON.stringify({ detail, handMetrics, viewportMetrics })}`);
+        assert(handMetrics.trayVisibleHeight >= 104, `低高度桌面视口下手牌区可见高度不足：${JSON.stringify({ detail, handMetrics, viewportMetrics })}`);
+        assert(detail.lobbyListVisibleHeight >= 112, `低高度桌面视口下大厅名单可见高度不足：${JSON.stringify({ detail, handMetrics, viewportMetrics })}`);
+        assert(viewportMetrics.axisY < 1 || viewportMetrics.scale < 1, "低高度桌面视口下应触发纵向收缩或整体缩放。");
+        return { detail, handMetrics, viewportMetrics };
+      })
+    );
+
+    results.push(
       await runScenario("discover-overlay-fit", browser, url, async (page) => {
         await page.evaluate(() => {
           const api = window.__AUTO_CHESS_TEST_API__;

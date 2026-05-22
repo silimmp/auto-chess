@@ -7,6 +7,7 @@ function startGameApp() {
   let postBattleTimerId = null;
   let battleAnimationTimerId = null;
   let battleAnimationRunId = 0;
+  let appScaleSyncFrame = 0;
   let dragState = createDragState();
   let touchSelection = {
     active: false,
@@ -143,13 +144,26 @@ function startGameApp() {
     const shopBoard = document.querySelector("#shop-board");
     const boardZone = document.querySelector(".prep-board-zone");
     const hudColumn = document.querySelector(".hud-column");
+    const lobbyListBlock = document.querySelector(".lobby-list-block");
     const shopToolbar = document.querySelector(".shop-toolbar");
     const topActions = document.querySelector(".top-actions");
-    if (!frame || !shell || !prepPanel || !handZone || !handBoard || !shopZone || !shopBoard || !boardZone || !hudColumn || !shopToolbar) {
+    if (
+      !frame ||
+      !shell ||
+      !prepPanel ||
+      !handZone ||
+      !handBoard ||
+      !shopZone ||
+      !shopBoard ||
+      !boardZone ||
+      !hudColumn ||
+      !lobbyListBlock ||
+      !shopToolbar
+    ) {
       return;
     }
 
-    function clampAxis(value, minimum = 0.78) {
+    function clampAxis(value, minimum = 0.72) {
       return Math.max(minimum, Math.min(1, value));
     }
 
@@ -166,6 +180,7 @@ function startGameApp() {
       const handBoardRect = handBoard.getBoundingClientRect();
       const handCardRect = handCard?.getBoundingClientRect() || null;
       const hudRect = hudColumn.getBoundingClientRect();
+      const lobbyListRect = lobbyListBlock.getBoundingClientRect();
       const toolbarRect = shopToolbar.getBoundingClientRect();
       const topActionsRect = topActions?.getBoundingClientRect() || null;
 
@@ -197,14 +212,23 @@ function startGameApp() {
       );
       const hudOverflowY = Math.max(0, hudRect.bottom - frameRect.bottom);
       const toolbarOverflowX = topActionsRect ? Math.max(0, topActionsRect.right - prepRect.right) : 0;
+      const handCardVisibleHeight = handCardRect
+        ? Math.max(0, Math.min(handRect.bottom, handCardRect.bottom) - Math.max(handRect.top, handCardRect.top))
+        : 0;
+      const minimumHandCardVisibleHeight = handCardRect ? Math.min(96, handCardRect.height * 0.58) : 0;
+      const handComfortShortfall = Math.max(0, minimumHandCardVisibleHeight - handCardVisibleHeight);
+      const minimumLobbyVisibleHeight = 132;
+      const lobbyComfortShortfall = Math.max(0, minimumLobbyVisibleHeight - lobbyListRect.height);
 
       return {
         contentHeight,
         contentWidth,
         frameHeight: frameRect.height,
         frameWidth: frameRect.width,
+        handComfortShortfall,
         heightOverflow: Math.max(0, contentHeight - frameRect.height),
         hudOverflowY,
+        lobbyComfortShortfall,
         overlapY,
         shellHeight: shellRect.height,
         shellWidth: shellRect.width,
@@ -224,9 +248,21 @@ function startGameApp() {
       metrics = collectLayoutMetrics();
     }
 
-    if (metrics.heightOverflow > 0 || metrics.overlapY > 0 || metrics.hudOverflowY > 0) {
-      const heightPressure = (metrics.heightOverflow + metrics.overlapY + metrics.hudOverflowY) / Math.max(1, metrics.frameHeight);
-      axisY = clampAxis(1 - heightPressure * 1.5, 0.74);
+    if (
+      metrics.heightOverflow > 0 ||
+      metrics.overlapY > 0 ||
+      metrics.hudOverflowY > 0 ||
+      metrics.handComfortShortfall > 0 ||
+      metrics.lobbyComfortShortfall > 0
+    ) {
+      const heightPressure =
+        (metrics.heightOverflow +
+          metrics.overlapY +
+          metrics.hudOverflowY +
+          metrics.handComfortShortfall * 1.15 +
+          metrics.lobbyComfortShortfall * 1.45) /
+        Math.max(1, metrics.frameHeight);
+      axisY = clampAxis(1 - heightPressure * 1.65, 0.68);
       root.style.setProperty("--layout-axis-y", String(axisY));
       metrics = collectLayoutMetrics();
     }
@@ -235,6 +271,16 @@ function startGameApp() {
     const heightScale = metrics.frameHeight / Math.max(1, metrics.contentHeight);
     const scale = Math.min(1, widthScale, heightScale);
     root.style.setProperty("--app-scale", String(Math.max(0.1, scale)));
+  }
+
+  function scheduleAppScaleSync() {
+    if (appScaleSyncFrame !== 0) {
+      return;
+    }
+    appScaleSyncFrame = window.requestAnimationFrame(() => {
+      appScaleSyncFrame = 0;
+      syncAppScale();
+    });
   }
 
   function resetGame() {
@@ -258,6 +304,9 @@ function startGameApp() {
       bindPrepCardInteractions,
       getPhaseLabel,
     });
+    if (state.phase === "prep" || state.discover) {
+      scheduleAppScaleSync();
+    }
   }
 
   function renderStatusOnly() {
