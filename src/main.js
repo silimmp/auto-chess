@@ -28,6 +28,7 @@ function startGameApp() {
   elements.resetBtn?.addEventListener("click", resetGame);
   elements.board?.addEventListener("click", handleBoardTapDeploy);
   elements.hand?.addEventListener("click", handleHandZoneTap);
+  elements.battleDebugCaptureBtn?.addEventListener("click", captureBattleDebugContext);
 
   window.addEventListener("pointermove", handleGlobalPointerMove);
   window.addEventListener("pointerup", handleGlobalPointerUp);
@@ -122,6 +123,9 @@ function startGameApp() {
 
   function syncAppScale() {
     const root = document.documentElement;
+    if (!root) {
+      return;
+    }
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const safeHorizontal = 24;
@@ -307,6 +311,7 @@ function startGameApp() {
     if (state.phase === "prep" || state.discover) {
       scheduleAppScaleSync();
     }
+    window.__AUTO_CHESS_BATTLE_EFFECTS__?.sync?.();
   }
 
   function renderStatusOnly() {
@@ -325,13 +330,13 @@ function startGameApp() {
   }
 
   function refreshShop() {
-    if (refreshShopState(state, (tier) => generateShop(tier, pickRandom))) {
+    if (refreshShopState(state, (tier, activeTribes) => generateShop(tier, pickRandom, activeTribes))) {
       render();
     }
   }
 
   function upgradeTavern() {
-    if (upgradeTavernState(state, UPGRADE_COSTS, (tier) => generateShop(tier, pickRandom))) {
+    if (upgradeTavernState(state, UPGRADE_COSTS, (tier, activeTribes) => generateShop(tier, pickRandom, activeTribes))) {
       render();
     }
   }
@@ -418,10 +423,14 @@ function startGameApp() {
       return true;
     }
 
+    const cardKind = getHandCardKind(state.hand[index]);
     touchSelection.active = true;
     touchSelection.sourceZone = "hand";
     touchSelection.index = index;
-    state.message = `已选中 ${state.hand[index].name}，点一下战场即可上场，或长按继续拖拽。`;
+    state.message =
+      cardKind === "brandSpell"
+        ? `已选中 ${state.hand[index].name}，点一下友方随从即可施放，或长按继续拖拽。`
+        : `已选中 ${state.hand[index].name}，点一下战场即可上场，或长按继续拖拽。`;
     render();
     return true;
   }
@@ -449,7 +458,10 @@ function startGameApp() {
       return;
     }
 
-    const targetIndex = getBoardTapInsertIndex(event.clientX);
+    const selectedCard = state.hand[touchSelection.index];
+    const cardKind = getHandCardKind(selectedCard);
+    const targetIndex =
+      cardKind === "brandSpell" ? getBoardTapTargetIndex(event) : getBoardTapInsertIndex(event.clientX);
     playCardFromHand(touchSelection.index, targetIndex);
   }
 
@@ -473,6 +485,34 @@ function startGameApp() {
       }
     }
     return cards.length;
+  }
+
+  function getBoardTapTargetIndex(event) {
+    const targetCard = event.target.closest(".minion-card");
+    if (targetCard && targetCard.dataset.index) {
+      return Number(targetCard.dataset.index);
+    }
+    return getNearestBoardIndex(event.clientX);
+  }
+
+  function getNearestBoardIndex(clientX) {
+    const cards = [...elements.board.querySelectorAll(".minion-card")];
+    if (!cards.length) {
+      return -1;
+    }
+
+    let bestIndex = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    cards.forEach((card, index) => {
+      const rect = card.getBoundingClientRect();
+      const center = rect.left + rect.width / 2;
+      const distance = Math.abs(clientX - center);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    });
+    return bestIndex;
   }
 
   function startPrepPhase() {
@@ -583,22 +623,40 @@ function startGameApp() {
 
   function beginBattlePlayback(result, intro, roundMessage, damage) {
     const runId = ++battleAnimationRunId;
+    window.__AUTO_CHESS_BATTLE_DEBUG__?.startBattleBuffer?.({
+      runId,
+      playerStartIds: result.startingPlayer.map((minion) => minion.instanceId ?? minion.id ?? null),
+      enemyStartIds: result.startingEnemy.map((minion) => minion.instanceId ?? minion.id ?? null),
+      frameCount: result.frames.length,
+    });
+    setBattleDebugStatus("按钮会抓取最近一段战斗上下文。");
     state.battleAnimation = {
       active: true,
       isAnimating: true,
       playerBoard: result.startingPlayer.map(copyMinion),
       enemyBoard: result.startingEnemy.map(copyMinion),
+      previousPlayerBoard: result.startingPlayer.map(copyMinion),
+      previousEnemyBoard: result.startingEnemy.map(copyMinion),
+      actionType: "",
+      attackKeyword: "",
       attackerId: null,
       defenderId: null,
+      effectSourceId: null,
       attackerSide: "",
       defenderSide: "",
+      focusAttackerId: null,
+      focusDefenderId: null,
+      focusAttackerSide: "",
+      focusDefenderSide: "",
       hitIds: [],
+      hitEffects: [],
       defeatedIds: [],
       cues: [],
       progressLabel: "战斗开始",
       logLines: [],
     };
     render();
+    window.__AUTO_CHESS_BATTLE_EFFECTS__?.reset?.();
 
     void playBattleFrames(runId, result, intro, roundMessage, damage);
   }
@@ -622,6 +680,9 @@ function startGameApp() {
 
   function stopBattlePlayback() {
     battleAnimationRunId += 1;
+    window.__AUTO_CHESS_BATTLE_DEBUG__?.record?.("battle-run-stop", {
+      runId: battleAnimationRunId,
+    });
     if (battleAnimationTimerId !== null) {
       window.clearTimeout(battleAnimationTimerId);
       battleAnimationTimerId = null;
@@ -646,13 +707,62 @@ function startGameApp() {
     }
 
     for (const frame of result.frames) {
+      window.__AUTO_CHESS_BATTLE_DEBUG__?.record?.("battle-frame", {
+        runId,
+        actionType: frame.actionType || "attack",
+        progress: frame.progress || "",
+        delay: frame.delay ?? 0,
+        attackKeyword: frame.attackKeyword || "",
+        attackerId: frame.attackerId ?? null,
+        attackerSide: frame.attackerSide || "",
+        defenderId: frame.defenderId ?? null,
+        defenderSide: frame.defenderSide || "",
+        effectSourceId: frame.effectSourceId ?? null,
+        hitIds: Array.isArray(frame.hitIds) ? [...frame.hitIds] : [],
+        hitEffects: Array.isArray(frame.hitEffects)
+          ? frame.hitEffects.map((effect) => ({
+              targetId: effect.targetId ?? null,
+              type: effect.type || "",
+            }))
+          : [],
+        defeatedIds: Array.isArray(frame.defeatedIds) ? [...frame.defeatedIds] : [],
+        cues: Array.isArray(frame.cues)
+          ? frame.cues.map((cue) => ({
+              targetId: cue.targetId ?? null,
+              label: cue.label || "",
+            }))
+          : [],
+      });
+      let nextFocusAttackerId = state.battleAnimation.focusAttackerId ?? null;
+      let nextFocusDefenderId = state.battleAnimation.focusDefenderId ?? null;
+      let nextFocusAttackerSide = state.battleAnimation.focusAttackerSide || "";
+      let nextFocusDefenderSide = state.battleAnimation.focusDefenderSide || "";
+      const isFocusFrame =
+        (frame.actionType === "attack" || frame.actionType === "combatStart") &&
+        (frame.attackerId !== null || frame.defenderId !== null);
+      if (isFocusFrame) {
+        nextFocusAttackerId = frame.attackerId ?? null;
+        nextFocusDefenderId = frame.defenderId ?? null;
+        nextFocusAttackerSide = frame.attackerSide || "";
+        nextFocusDefenderSide = frame.defenderSide || "";
+      }
+      state.battleAnimation.previousPlayerBoard = state.battleAnimation.playerBoard.map(copyMinion);
+      state.battleAnimation.previousEnemyBoard = state.battleAnimation.enemyBoard.map(copyMinion);
       state.battleAnimation.playerBoard = frame.playerBoard.map(copyMinion);
       state.battleAnimation.enemyBoard = frame.enemyBoard.map(copyMinion);
+      state.battleAnimation.actionType = frame.actionType || "attack";
+      state.battleAnimation.attackKeyword = frame.attackKeyword || "";
       state.battleAnimation.attackerId = frame.attackerId;
       state.battleAnimation.defenderId = frame.defenderId;
+      state.battleAnimation.effectSourceId = frame.effectSourceId ?? null;
       state.battleAnimation.attackerSide = frame.attackerSide;
       state.battleAnimation.defenderSide = frame.defenderSide;
+      state.battleAnimation.focusAttackerId = nextFocusAttackerId;
+      state.battleAnimation.focusDefenderId = nextFocusDefenderId;
+      state.battleAnimation.focusAttackerSide = nextFocusAttackerSide;
+      state.battleAnimation.focusDefenderSide = nextFocusDefenderSide;
       state.battleAnimation.hitIds = [...frame.hitIds];
+      state.battleAnimation.hitEffects = frame.hitEffects ? frame.hitEffects.map((effect) => ({ ...effect })) : [];
       state.battleAnimation.defeatedIds = [...frame.defeatedIds];
       state.battleAnimation.cues = frame.cues ? frame.cues.map((cue) => ({ ...cue })) : [];
       state.battleAnimation.progressLabel = frame.progress;
@@ -660,6 +770,7 @@ function startGameApp() {
         state.battleAnimation.logLines = [...state.battleAnimation.logLines, frame.log];
       }
       render();
+      window.__AUTO_CHESS_BATTLE_EFFECTS__?.playFrameEffects?.(frame);
       await waitBattleDelay(frame.delay);
       if (runId !== battleAnimationRunId) {
         return;
@@ -667,6 +778,12 @@ function startGameApp() {
     }
 
     state.hp = getLobbyPlayerById(state.lobby, "player")?.hp ?? state.hp;
+    window.__AUTO_CHESS_BATTLE_DEBUG__?.record?.("battle-run-finish", {
+      runId,
+      playerRemainingIds: result.remainingPlayer.map((minion) => minion.instanceId ?? minion.id ?? null),
+      enemyRemainingIds: result.remainingEnemy.map((minion) => minion.instanceId ?? minion.id ?? null),
+      damage,
+    });
 
     state.battleAnimation = {
       ...state.battleAnimation,
@@ -674,11 +791,21 @@ function startGameApp() {
       isAnimating: false,
       playerBoard: result.remainingPlayer.map(copyMinion),
       enemyBoard: result.remainingEnemy.map(copyMinion),
+      previousPlayerBoard: result.remainingPlayer.map(copyMinion),
+      previousEnemyBoard: result.remainingEnemy.map(copyMinion),
+      actionType: "",
+      attackKeyword: "",
       attackerId: null,
       defenderId: null,
+      effectSourceId: null,
       attackerSide: "",
       defenderSide: "",
+      focusAttackerId: null,
+      focusDefenderId: null,
+      focusAttackerSide: "",
+      focusDefenderSide: "",
       hitIds: [],
+      hitEffects: [],
       defeatedIds: [],
       cues: [],
       progressLabel: result.summary,
@@ -712,12 +839,97 @@ function startGameApp() {
     render();
   }
 
+  function setBattleDebugStatus(text, tone = "idle") {
+    if (!elements.battleDebugStatus) {
+      return;
+    }
+    elements.battleDebugStatus.textContent = text;
+    elements.battleDebugStatus.dataset.tone = tone;
+  }
+
+  function summarizeBattleBoard(board) {
+    return (Array.isArray(board) ? board : []).map((minion) => ({
+      id: minion.instanceId ?? minion.id ?? null,
+      name: minion.name,
+      attack: minion.attack,
+      health: minion.health,
+      keywords: Array.isArray(minion.keywords) ? [...minion.keywords] : [],
+    }));
+  }
+
+  function buildBattleDebugSnapshot() {
+    return {
+      turn: state.turn,
+      phase: state.phase,
+      message: state.message,
+      opponent: state.currentOpponentName,
+      battleAnimation: {
+        active: state.battleAnimation.active,
+        isAnimating: state.battleAnimation.isAnimating,
+        actionType: state.battleAnimation.actionType,
+        attackKeyword: state.battleAnimation.attackKeyword,
+        attackerId: state.battleAnimation.attackerId,
+        attackerSide: state.battleAnimation.attackerSide,
+        defenderId: state.battleAnimation.defenderId,
+        defenderSide: state.battleAnimation.defenderSide,
+        focusAttackerId: state.battleAnimation.focusAttackerId,
+        focusAttackerSide: state.battleAnimation.focusAttackerSide,
+        focusDefenderId: state.battleAnimation.focusDefenderId,
+        focusDefenderSide: state.battleAnimation.focusDefenderSide,
+        effectSourceId: state.battleAnimation.effectSourceId,
+        hitIds: [...state.battleAnimation.hitIds],
+        defeatedIds: [...state.battleAnimation.defeatedIds],
+        progressLabel: state.battleAnimation.progressLabel,
+        logLines: [...state.battleAnimation.logLines.slice(-8)],
+      },
+      playerBoard: summarizeBattleBoard(state.battleAnimation.playerBoard),
+      enemyBoard: summarizeBattleBoard(state.battleAnimation.enemyBoard),
+      overlay: {
+        progress: elements.battleProgressLabel?.textContent || "",
+        summary: elements.battleSummaryText?.textContent || "",
+      },
+    };
+  }
+
+  async function captureBattleDebugContext() {
+    const runtime = window.__AUTO_CHESS_BATTLE_DEBUG__;
+    if (!runtime) {
+      setBattleDebugStatus("抓取器不可用。", "error");
+      return;
+    }
+
+    const snapshot = buildBattleDebugSnapshot();
+    const entries = runtime.getEntries().slice(-180);
+    const text = runtime.formatCapture({
+      kind: "battle-jitter-capture",
+      snapshot,
+      entries,
+    });
+    window.__AUTO_CHESS_BATTLE_DEBUG_LAST_CAPTURE__ = text;
+    const safeTurn = String(state.turn || "x");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `battle-jitter-turn-${safeTurn}-${stamp}.json`;
+
+    try {
+      const copied = await runtime.copyText(text);
+      if (copied) {
+        setBattleDebugStatus(`已抓取 ${entries.length} 条并复制到剪贴板。`, "success");
+      } else {
+        runtime.downloadText?.(text, filename);
+        setBattleDebugStatus(`已抓取 ${entries.length} 条；已自动下载 ${filename}。`, "warn");
+      }
+    } catch {
+      runtime.downloadText?.(text, filename);
+      setBattleDebugStatus(`已抓取 ${entries.length} 条；复制失败，已自动下载 ${filename}。`, "warn");
+    }
+  }
+
   function startNextTurn() {
     startNextTurnState(
       state,
-      (tier) => generateShop(tier, pickRandom),
-      (shop, tier) => refillShop(shop, tier, pickRandom),
-      (turn) => generateEnemyBoard(turn, pickRandom, randomInt),
+      (tier, activeTribes) => generateShop(tier, pickRandom, activeTribes),
+      (shop, tier, activeTribes) => refillShop(shop, tier, pickRandom, activeTribes),
+      (turn, nextPickRandom, nextRandomInt, activeTribes) => generateEnemyBoard(turn, nextPickRandom, nextRandomInt, activeTribes),
       pickRandom,
       randomInt
     );

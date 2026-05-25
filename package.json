@@ -9,5 +9,8 @@
   },
   "devDependencies": {
     "playwright-core": "^1.60.0"
+  },
+  "dependencies": {
+    "pixi.js": "^8.18.1"
   }
 }

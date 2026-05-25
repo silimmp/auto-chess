@@ -806,6 +806,59 @@ body::after {
   flex-wrap: wrap;
   justify-self: end;
   align-self: start;
+  margin-top: -1px;
+}
+
+.active-tribes-card {
+  position: absolute;
+  top: 14px;
+  left: calc(50% + var(--countdown-width) / 2 + 8px);
+  display: grid;
+  gap: 5px;
+  width: min(248px, 22vw);
+  min-width: 176px;
+  max-height: 56px;
+  padding: 7px 9px 8px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.active-tribes-list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.active-tribe-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(130, 90, 44, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 238, 0.96), rgba(238, 220, 186, 0.96)),
+    rgba(255, 255, 255, 0.2);
+  color: rgba(83, 51, 22, 0.92);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.active-tribe-chip.neutral {
+  background:
+    linear-gradient(180deg, rgba(246, 246, 246, 0.96), rgba(220, 220, 220, 0.96)),
+    rgba(255, 255, 255, 0.2);
+  color: rgba(66, 66, 66, 0.92);
 }
 
 .compact-countdown {
@@ -1302,6 +1355,60 @@ body::after {
   will-change: transform;
 }
 
+.drag-preview-arrow {
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  pointer-events: none;
+  left: 0;
+  top: 0;
+}
+
+.drag-preview-arrow-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.drag-preview-arrow-shadow,
+.drag-preview-arrow-core {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.drag-preview-arrow-shadow {
+  stroke: rgba(255, 139, 83, 0.18);
+  stroke-width: 11;
+  filter: blur(2px);
+}
+
+.drag-preview-arrow-core {
+  stroke: rgba(255, 139, 83, 0.52);
+  stroke-width: 7.5;
+}
+
+.drag-preview-arrow-head {
+  fill: rgba(255, 139, 83, 0.52);
+}
+
+.drag-preview-arrow-label {
+  position: absolute;
+  left: 10px;
+  top: calc(var(--arrow-source-y, 50vh) - 14px);
+  transform: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #fff7ea;
+  background: rgba(88, 48, 18, 0.86);
+  font-size: 10px;
+  font-weight: 700;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .drag-preview .card-actions {
   display: none;
 }
@@ -1321,9 +1428,9 @@ body::after {
 .dragging-card .board-row .minion-card:hover,
 .dragging-card .hand-row .minion-card:focus-within,
 .dragging-card .minion-main:has(.card-info-toggle:hover) .minion-info-overlay,
-.dragging-card .minion-main:has(.card-info-toggle:focus) .minion-info-overlay,
+.dragging-card .minion-main:has(.card-info-toggle:focus-visible) .minion-info-overlay,
 .dragging-card .minion-main:has(.minion-info-overlay:hover) .minion-info-overlay,
-.dragging-card .minion-card:focus-within .minion-info-overlay {
+.dragging-card .minion-main:has(.minion-info-overlay:focus-within) .minion-info-overlay {
   transform: none;
   box-shadow: inherit;
   filter: none;
@@ -1362,14 +1469,7 @@ body::after {
 }
 
 .minion-card::before {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  z-index: 0;
-  border: 0;
-  border-radius: 14px 14px 16px 16px / 12px 12px 18px 18px;
-  background: none;
-  pointer-events: none;
+  content: none;
 }
 
 .minion-card::after {
@@ -1395,10 +1495,31 @@ body::after {
 }
 
 .minion-card.golden::before {
-  border-color: rgba(181, 130, 16, 0.3);
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  border-radius: inherit;
+  pointer-events: none;
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.28), transparent 38%),
     linear-gradient(180deg, rgba(255, 248, 206, 0.34), rgba(255, 255, 255, 0));
+}
+
+.minion-card.has-divine-shield {
+  border-color: rgba(109, 197, 255, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 16px 28px rgba(52, 106, 176, 0.12);
+}
+
+.minion-card.has-divine-shield::before {
+  content: none;
+}
+
+.minion-card.has-divine-shield::after {
+  content: none;
 }
 
 .reward-card {
@@ -1441,6 +1562,17 @@ body::after {
   color: rgba(101, 63, 20, 0.74);
 }
 
+.brand-card {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.46), transparent 40%),
+    linear-gradient(180deg, rgba(232, 244, 223, 0.98), rgba(122, 160, 88, 0.96)),
+    linear-gradient(135deg, rgba(255, 236, 170, 0.22), transparent 68%);
+  border-color: rgba(71, 107, 42, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 16px 28px rgba(53, 87, 24, 0.18);
+}
+
 .minion-card.battle-card {
   position: relative;
   min-height: 182px;
@@ -1466,56 +1598,102 @@ body::after {
   transition: opacity 120ms ease;
 }
 
-.battle-float-cue {
-  position: absolute;
-  left: 50%;
-  top: -10px;
-  transform: translateX(-50%);
-  z-index: 4;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-  color: #fffdf8;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18);
-  animation: battleCueRise 0.82s ease-out 1;
-  pointer-events: none;
+.minion-card.battle-card.has-divine-shield {
+  border-color: rgba(122, 205, 255, 0.58);
+  box-shadow:
+    0 12px 20px rgba(74, 44, 13, 0.1),
+    0 0 20px rgba(111, 203, 255, 0.14);
 }
 
-.battle-float-cue.attack {
-  background: linear-gradient(180deg, rgba(187, 87, 54, 0.98), rgba(121, 43, 23, 0.98));
+.minion-card.battle-card.has-divine-shield::before {
+  content: none;
 }
 
-.battle-float-cue.shield {
-  background: linear-gradient(180deg, rgba(88, 154, 228, 0.98), rgba(38, 86, 144, 0.98));
-}
-
-.battle-float-cue.necromancy {
-  background: linear-gradient(180deg, rgba(110, 156, 108, 0.98), rgba(56, 94, 58, 0.98));
-}
-
-.battle-float-cue.neutral {
-  background: linear-gradient(180deg, rgba(146, 116, 77, 0.96), rgba(88, 63, 35, 0.96));
+.minion-card.battle-card.has-divine-shield::after {
+  content: none;
 }
 
 .minion-card.attacking {
+  z-index: 12;
   box-shadow:
     0 20px 32px rgba(138, 47, 35, 0.26),
     0 0 0 2px rgba(169, 68, 47, 0.22);
 }
 
-.minion-card.attacking:not(.charge-player):not(.charge-enemy) {
-  transform: translateY(-6px) scale(1.02);
-  animation: battlePulse 0.7s ease-in-out infinite alternate;
+.battle-board .minion-card.battle-idle {
+  opacity: 0.44;
+  filter: saturate(0.7) brightness(0.92);
+  transform: scale(0.985);
+}
+
+.minion-card.attacking:not([class*="charge-"]) {
+  transform: translateY(-4px) scale(1.01);
+}
+
+.minion-card.casting {
+  box-shadow:
+    0 16px 28px rgba(170, 123, 45, 0.18),
+    0 0 0 2px rgba(190, 146, 58, 0.16);
+  transform: translateY(-1px) scale(1.005);
+}
+
+.minion-card.battle-card.casting {
+  box-shadow:
+    0 22px 34px rgba(183, 130, 35, 0.24),
+    0 0 0 2px rgba(216, 170, 72, 0.26);
 }
 
 .minion-card.defending {
+  z-index: 6;
   box-shadow:
     0 14px 28px rgba(41, 90, 139, 0.2),
     0 0 0 2px rgba(41, 90, 139, 0.2);
-  animation: guardPulse 0.85s ease-in-out infinite alternate;
+}
+
+.battle-damage-pop {
+  position: absolute;
+  left: 50%;
+  top: 24%;
+  z-index: 6;
+  min-width: 44px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: damagePopRise 1.1s ease-out 1;
+}
+
+.battle-damage-pop.primary {
+  color: #fffdf8;
+  background: linear-gradient(180deg, rgba(232, 88, 58, 0.98), rgba(152, 34, 20, 0.96));
+  box-shadow:
+    0 0 0 1px rgba(255, 228, 192, 0.18),
+    0 12px 22px rgba(143, 45, 28, 0.28),
+    0 0 22px rgba(232, 88, 58, 0.18);
+}
+
+.battle-damage-pop.secondary {
+  color: #f8fcff;
+  background: linear-gradient(180deg, rgba(90, 154, 224, 0.96), rgba(39, 84, 146, 0.94));
+  box-shadow:
+    0 0 0 1px rgba(232, 244, 255, 0.16),
+    0 12px 22px rgba(42, 79, 119, 0.24),
+    0 0 20px rgba(90, 154, 224, 0.16);
+}
+
+.battle-damage-pop.splash {
+  color: #fff9f1;
+  background: linear-gradient(180deg, rgba(236, 138, 68, 0.96), rgba(168, 86, 22, 0.94));
+  box-shadow:
+    0 0 0 1px rgba(255, 232, 204, 0.18),
+    0 12px 22px rgba(152, 85, 27, 0.24),
+    0 0 20px rgba(236, 138, 68, 0.18);
 }
 
 .minion-card.defeated {
@@ -1524,91 +1702,31 @@ body::after {
   transform: scale(0.97);
 }
 
-.minion-card.charge-enemy,
-.minion-card.charge-player {
-  z-index: 2;
-  animation-duration: 1s;
-  animation-timing-function: cubic-bezier(0.2, 0.72, 0.2, 1);
+.minion-card.charge-advance,
+.minion-card.charge-return {
+  z-index: 14;
+  will-change: transform;
+  animation-timing-function: cubic-bezier(0.24, 0.78, 0.24, 1);
   animation-fill-mode: both;
 }
 
-.minion-card.charge-enemy {
-  animation-name: attackChargeEnemy;
+.minion-card.charge-advance {
+  animation-name: attackChargeAdvance;
+  animation-duration: 0.42s;
 }
 
-.minion-card.charge-player {
-  animation-name: attackChargePlayer;
+.minion-card.charge-return {
+  animation-name: attackChargeReturn;
+  animation-duration: 0.32s;
 }
 
-.minion-card.taking-hit {
-  animation: impactShake 0.42s ease-out 1;
+.minion-card.battle-card .minion-main {
+  gap: 6px;
 }
 
-.minion-card.trail-enemy::after,
-.minion-card.trail-player::after {
-  opacity: 1;
-}
-
-.minion-card.trail-enemy::after {
-  background:
-    linear-gradient(180deg, rgba(90, 138, 201, 0.3), transparent 62%),
-    radial-gradient(circle at 50% 22%, rgba(179, 214, 255, 0.24), transparent 48%);
-  filter: blur(8px);
-  animation: slashTrailEnemy 0.72s ease-out 1;
-}
-
-.minion-card.trail-player::after {
-  background:
-    linear-gradient(0deg, rgba(195, 84, 54, 0.3), transparent 62%),
-    radial-gradient(circle at 50% 78%, rgba(255, 198, 160, 0.24), transparent 48%);
-  filter: blur(8px);
-  animation: slashTrailPlayer 0.72s ease-out 1;
-}
-
-.minion-card.impact-enemy::after,
-.minion-card.impact-player::after {
-  opacity: 1;
-}
-
-.minion-card.impact-enemy::after {
-  background:
-    radial-gradient(circle, rgba(115, 180, 255, 0.4), rgba(115, 180, 255, 0.08) 45%, transparent 68%);
-  animation: impactFlash 0.42s ease-out 1;
-}
-
-.minion-card.impact-player::after {
-  background:
-    radial-gradient(circle, rgba(255, 153, 119, 0.44), rgba(255, 153, 119, 0.08) 45%, transparent 68%);
-  animation: impactFlash 0.42s ease-out 1;
-}
-
-.minion-card.vanishing {
-  animation: defeatSink 0.6s cubic-bezier(0.22, 0.7, 0.2, 1) 1;
-}
-
-.minion-card.vanishing::after {
-  opacity: 1;
-  background:
-    radial-gradient(circle, rgba(255, 238, 197, 0.34), rgba(255, 238, 197, 0.06) 46%, transparent 70%);
-  animation: defeatGlow 0.58s ease-out 1;
-}
-
-.minion-card.reviving {
-  animation: rebornLift 0.58s ease-out 1;
-}
-
-.minion-card.reviving::after {
-  opacity: 1;
-  background:
-    radial-gradient(circle, rgba(164, 223, 163, 0.36), rgba(164, 223, 163, 0.08) 46%, transparent 70%);
-  animation: rebornFlash 0.58s ease-out 1;
-}
-
-.battle-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
+.minion-card.battle-card .keyword-row {
+  margin-top: 2px;
+  justify-content: center;
 }
 
 .battle-slot {
@@ -1624,20 +1742,8 @@ body::after {
   background: linear-gradient(180deg, rgba(255, 251, 239, 0.72), rgba(226, 208, 180, 0.9));
 }
 
-.battle-role {
-  border-radius: 999px;
-  padding: 3px 7px;
-  font-size: 9px;
-  font-weight: 700;
-  color: #fff8ee;
-}
-
-.battle-role.attacker {
-  background: rgba(169, 68, 47, 0.9);
-}
-
-.battle-role.defender {
-  background: rgba(41, 90, 139, 0.92);
+.battle-arena.impact-shaking {
+  animation: arenaImpactShake 0.11s cubic-bezier(0.22, 0.8, 0.24, 1) 1;
 }
 
 .minion-header {
@@ -1755,9 +1861,9 @@ body::after {
 }
 
 .minion-main:has(.card-info-toggle:hover) .minion-info-overlay,
-.minion-main:has(.card-info-toggle:focus) .minion-info-overlay,
+.minion-main:has(.card-info-toggle:focus-visible) .minion-info-overlay,
 .minion-main:has(.minion-info-overlay:hover) .minion-info-overlay,
-.minion-card:focus-within .minion-info-overlay,
+.minion-main:has(.minion-info-overlay:focus-within) .minion-info-overlay,
 .minion-card.info-open .minion-info-overlay {
   opacity: 1;
   pointer-events: auto;
@@ -2074,6 +2180,12 @@ body::after {
   display: grid;
   justify-items: center;
   gap: 2px;
+  padding: 8px 18px;
+  border-radius: 18px;
+  transition:
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .battle-topbar-label {
@@ -2123,6 +2235,86 @@ body::after {
   color: rgba(255, 235, 201, 0.82);
 }
 
+.battle-debug-controls {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.battle-debug-btn {
+  border: 1px solid rgba(255, 225, 169, 0.28);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 221, 152, 0.18), rgba(132, 63, 27, 0.34)),
+    rgba(36, 17, 14, 0.72);
+  color: #fff2d4;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 228, 0.12),
+    0 8px 18px rgba(0, 0, 0, 0.16);
+}
+
+.battle-debug-btn:hover,
+.battle-debug-btn:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 235, 192, 0.44);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 228, 0.16),
+    0 10px 22px rgba(0, 0, 0, 0.22);
+}
+
+.battle-debug-status {
+  max-width: 440px;
+  min-height: 16px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(255, 229, 193, 0.72);
+}
+
+.battle-debug-status[data-tone="success"] {
+  color: #ffeeb9;
+}
+
+.battle-debug-status[data-tone="warn"] {
+  color: #ffd6a4;
+}
+
+.battle-debug-status[data-tone="error"] {
+  color: #ffb4a2;
+}
+
+.battle-overlay[data-action-type="combatStart"] .battle-topbar-center {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 225, 136, 0.3), transparent 58%),
+    linear-gradient(180deg, rgba(255, 243, 214, 0.08), rgba(255, 243, 214, 0.02));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 230, 0.16),
+    0 0 0 1px rgba(255, 215, 130, 0.14),
+    0 12px 24px rgba(85, 56, 18, 0.18);
+  transform: translateY(1px) scale(1.01);
+}
+
+.battle-overlay[data-action-type="combatStart"] .battle-progress-label {
+  color: #fff7dd;
+  text-shadow:
+    0 0 14px rgba(255, 210, 110, 0.4),
+    0 6px 18px rgba(0, 0, 0, 0.24);
+}
+
+.battle-overlay[data-action-type="combatStart"] .battle-summary-text {
+  color: rgba(255, 241, 212, 0.96);
+}
+
 .battle-stage {
   display: grid;
   grid-template-columns: 1fr;
@@ -2156,6 +2348,20 @@ body::after {
   overflow: visible;
 }
 
+.battle-vfx-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.battle-vfx-layer canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .battle-arena-full {
   grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: stretch;
@@ -2168,6 +2374,16 @@ body::after {
   min-height: 0;
   align-content: center;
   position: relative;
+  z-index: 2;
+}
+
+.battle-overlay[data-focus-side="enemy"] .battle-side:first-child,
+.battle-overlay[data-focus-side="player"] .battle-side:last-child {
+  z-index: 2;
+}
+
+.battle-overlay[data-focus-side="enemy"] .battle-side:last-child,
+.battle-overlay[data-focus-side="player"] .battle-side:first-child {
   z-index: 1;
 }
 
@@ -2244,219 +2460,84 @@ body::after {
   box-shadow: none;
 }
 
-@keyframes battlePulse {
-  from {
-    transform: translateY(-3px) scale(1);
+@keyframes attackChargeAdvance {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1.01);
   }
 
-  to {
-    transform: translateY(-8px) scale(1.025);
+  100% {
+    transform: translate3d(var(--attack-dash-x, 0px), var(--attack-dash-y, 0px), 0) scale(1.04);
   }
 }
 
-@keyframes battleCueRise {
+@keyframes attackChargeReturn {
   0% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(10px) scale(0.92);
+    transform: translate3d(var(--attack-dash-x, 0px), var(--attack-dash-y, 0px), 0) scale(1.04);
   }
 
-  25% {
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes arenaImpactShake {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  24% {
+    transform: translate3d(var(--battle-shake-x, 0px), var(--battle-shake-y, 0px), 0);
+  }
+
+  52% {
+    transform: translate3d(calc(var(--battle-shake-x, 0px) * -0.72), calc(var(--battle-shake-y, 0px) * -0.7), 0);
+  }
+
+  78% {
+    transform: translate3d(calc(var(--battle-shake-x, 0px) * 0.34), calc(var(--battle-shake-y, 0px) * 0.28), 0);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes damagePopRise {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.76);
+  }
+
+  24% {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
+    transform: translateX(-50%) translateY(0) scale(1.08);
   }
 
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-24px) scale(1.02);
-  }
-}
-
-@keyframes slashTrailEnemy {
-  0% {
-    transform: translateY(-30px) scaleY(0.78);
-    opacity: 0;
-  }
-
-  35% {
-    transform: translateY(-10px) scaleY(1);
-    opacity: 0.9;
-  }
-
-  100% {
-    transform: translateY(18px) scaleY(1.08);
-    opacity: 0;
-  }
-}
-
-@keyframes slashTrailPlayer {
-  0% {
-    transform: translateY(30px) scaleY(0.78);
-    opacity: 0;
-  }
-
-  35% {
-    transform: translateY(10px) scaleY(1);
-    opacity: 0.9;
-  }
-
-  100% {
-    transform: translateY(-18px) scaleY(1.08);
-    opacity: 0;
-  }
-}
-
-@keyframes attackChargeEnemy {
-  0% {
-    transform: translateY(-4px) scale(1.01);
-  }
-
-  35% {
-    transform: translateY(8px) scale(1.03);
-  }
-
-  65% {
-    transform: translateY(24px) scale(1.06);
-  }
-
-  100% {
-    transform: translateY(-4px) scale(1.01);
-  }
-}
-
-@keyframes attackChargePlayer {
-  0% {
-    transform: translateY(-4px) scale(1.01);
-  }
-
-  35% {
-    transform: translateY(-14px) scale(1.03);
-  }
-
-  65% {
-    transform: translateY(-28px) scale(1.06);
-  }
-
-  100% {
-    transform: translateY(-4px) scale(1.01);
-  }
-}
-
-@keyframes impactShake {
-  0% {
-    transform: translateX(0) scale(1);
-  }
-
-  30% {
-    transform: translateX(-8px) scale(1.015);
-  }
-
-  60% {
-    transform: translateX(6px) scale(1.01);
-  }
-
-  100% {
-    transform: translateX(0) scale(1);
-  }
-}
-
-@keyframes impactFlash {
-  0% {
-    opacity: 0;
-    transform: scale(0.86);
-  }
-
-  28% {
+  62% {
     opacity: 1;
-    transform: scale(1.04);
+    transform: translateX(-50%) translateY(-6px) scale(1);
   }
 
   100% {
     opacity: 0;
-    transform: scale(1.16);
+    transform: translateX(-50%) translateY(-18px) scale(0.98);
   }
 }
 
-@keyframes defeatSink {
-  0% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-    filter: saturate(1);
-  }
-
-  45% {
-    transform: translateY(10px) scale(0.98);
-    opacity: 0.78;
-  }
-
-  100% {
-    transform: translateY(20px) scale(0.93);
-    opacity: 0.44;
-    filter: saturate(0.5);
-  }
-}
-
-@keyframes defeatGlow {
+@keyframes sweepArcSlash {
   0% {
     opacity: 0;
-    transform: scale(0.88);
+    transform: rotate(-16deg) translateX(-12%) scaleX(0.72);
   }
 
-  35% {
-    opacity: 1;
-    transform: scale(1.02);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.18);
-  }
-}
-
-@keyframes rebornLift {
-  0% {
-    transform: translateY(14px) scale(0.92);
-    opacity: 0.58;
-  }
-
-  55% {
-    transform: translateY(-6px) scale(1.03);
+  32% {
     opacity: 1;
   }
 
   100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes rebornFlash {
-  0% {
     opacity: 0;
-    transform: scale(0.84);
-  }
-
-  35% {
-    opacity: 1;
-    transform: scale(1.04);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.16);
+    transform: rotate(10deg) translateX(10%) scaleX(1.06);
   }
 }
 
-@keyframes guardPulse {
-  from {
-    box-shadow:
-      0 14px 28px rgba(41, 90, 139, 0.16),
-      0 0 0 1px rgba(41, 90, 139, 0.16);
-  }
-
-  to {
-    box-shadow:
-      0 18px 34px rgba(41, 90, 139, 0.28),
-      0 0 0 3px rgba(41, 90, 139, 0.22);
-  }
-}
 

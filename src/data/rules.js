@@ -8,10 +8,14 @@ const PREP_SECONDS_STEP = 10;
 const PREP_SECONDS_CAP = 60;
 const TIMER_TICK_MS = 250;
 const POST_BATTLE_DELAY_MS = 850;
-const BATTLE_INTRO_DELAY_MS = 320;
-const BATTLE_ACTION_DELAY_MS = 520;
-const BATTLE_HIT_DELAY_MS = 360;
-const BATTLE_CLEANUP_DELAY_MS = 260;
+const BATTLE_INTRO_DELAY_MS = 460;
+const BATTLE_ACTION_DELAY_MS = 740;
+const BATTLE_HIT_DELAY_MS = 520;
+const BATTLE_CLEANUP_DELAY_MS = 390;
+const BATTLE_ATTACK_ACTION_DELAY_MS = 430;
+const BATTLE_ATTACK_HIT_DELAY_MS = 420;
+const BATTLE_COMBAT_START_ACTION_DELAY_MS = 1020;
+const BATTLE_COMBAT_START_HIT_DELAY_MS = 740;
 const TOUCH_LONG_PRESS_MS = 110;
 const POINTER_DRAG_START_DISTANCE = 8;
 const TOUCH_DRAG_CANCEL_DISTANCE = 18;
@@ -36,7 +40,9 @@ const TURN_GOLD_BY_TURN = {
   7: 10,
 };
 
-const MINION_ABILITY_FIELDS = ["deathrattle", "combatStart", "turnStart", "turnEnd", "reborn", "damageTrigger"];
+const ALWAYS_AVAILABLE_TRIBE = "中立";
+const RANDOM_LOBBY_TRIBE_COUNT = 5;
+const MINION_ABILITY_FIELDS = ["deathrattle", "combatStart", "turnStart", "turnEnd", "reborn", "damageTrigger", "brandCastTrigger"];
 const SHOP_SLOTS = 5;
 const CONTENT_TIER_CAP = MAX_TAVERN_TIER;
 

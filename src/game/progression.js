@@ -5,7 +5,9 @@ function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard,
   if (upgradeCost !== null) {
     state.upgradeCost = Math.max(0, upgradeCost - 1);
   }
-  state.shop = state.shopFrozen ? refillShop(state.shop, state.tavernTier) : generateShop(state.tavernTier);
+  state.shop = state.shopFrozen
+    ? refillShop(state.shop, state.tavernTier, state.activeTribes)
+    : generateShop(state.tavernTier, state.activeTribes);
   state.shopFrozen = false;
   state.lobby.pairings = createPairings(state.lobby.players, state.turn);
   state.currentOpponentId = findOpponentIdForPlayer(state.lobby.pairings, "player");
@@ -13,7 +15,7 @@ function startNextTurnState(state, generateShop, refillShop, generateEnemyBoard,
   const currentOpponent = getLobbyPlayerById(state.lobby, state.currentOpponentId);
   if (currentOpponent) {
     if (!currentOpponent.isHuman && currentOpponent.alive && currentOpponent.board.length === 0) {
-      currentOpponent.board = generateEnemyBoard(state.turn, pickRandom, randomInt);
+      currentOpponent.board = generateEnemyBoard(state.turn, pickRandom, randomInt, state.activeTribes);
     }
   } else {
     state.currentOpponentName = LOBBY_GHOST_LABEL;
@@ -38,13 +40,13 @@ function upgradeTavernState(state, upgradeCosts, generateShop) {
   state.tavernTier += 1;
   state.upgradeCostTier = state.tavernTier;
   state.upgradeCost = upgradeCosts[state.tavernTier] ?? null;
-  state.shop = generateShop(state.tavernTier);
+  state.shop = generateShop(state.tavernTier, state.activeTribes);
   state.shopFrozen = false;
   state.message = `酒馆升级到 ${state.tavernTier} 级。`;
   return true;
 }
 
-function generateEnemyBoard(turn, pickRandom, randomInt) {
+function generateEnemyBoard(turn, pickRandom, randomInt, activeTribes = null) {
   const enemyTier = getEnemyBoardTier(turn);
   const baseSize = getEnemyBoardBaseSize(turn);
   const size = Math.min(
@@ -58,8 +60,9 @@ function generateEnemyBoard(turn, pickRandom, randomInt) {
 
   for (let index = 0; index < size; index += 1) {
     const minionTier = pickTierByOdds(ENEMY_TIER_ODDS[enemyTier], pickRandom);
-    const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier === minionTier);
-    const fallback = MINION_POOL.filter((minion) => !minion.token && minion.tier <= enemyTier);
+    const pool = filterMinionsByActiveTribes(MINION_POOL.filter((minion) => !minion.token), activeTribes);
+    const candidates = pool.filter((minion) => minion.tier === minionTier);
+    const fallback = pool.filter((minion) => minion.tier <= enemyTier);
     const minion = createOwnedMinion(pickRandom(candidates.length ? candidates : fallback).id);
     board.push(minion);
   }

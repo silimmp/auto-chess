@@ -44,6 +44,7 @@ class FakeElement {
   constructor(tagName = "div") {
     this.tagName = tagName.toUpperCase();
     this.children = [];
+    this.parentNode = null;
     this.dataset = {};
     this.style = {};
     this.classList = new FakeClassList();
@@ -54,7 +55,36 @@ class FakeElement {
   }
 
   appendChild(child) {
+    child.parentNode = this;
     this.children.push(child);
+    return child;
+  }
+
+  insertBefore(child, referenceNode) {
+    child.parentNode = this;
+    if (!referenceNode) {
+      this.children.push(child);
+      return child;
+    }
+    const index = this.children.indexOf(referenceNode);
+    if (index === -1) {
+      this.children.push(child);
+      return child;
+    }
+    const existingIndex = this.children.indexOf(child);
+    if (existingIndex !== -1) {
+      this.children.splice(existingIndex, 1);
+    }
+    this.children.splice(index, 0, child);
+    return child;
+  }
+
+  removeChild(child) {
+    const index = this.children.indexOf(child);
+    if (index !== -1) {
+      this.children.splice(index, 1);
+      child.parentNode = null;
+    }
     return child;
   }
 
@@ -89,6 +119,19 @@ class FakeElement {
   }
 
   remove() {}
+
+  get firstChild() {
+    return this.children[0] || null;
+  }
+
+  get nextSibling() {
+    if (!this.parentNode) {
+      return null;
+    }
+    const siblings = this.parentNode.children;
+    const index = siblings.indexOf(this);
+    return index >= 0 ? siblings[index + 1] || null : null;
+  }
 }
 
 function assert(condition, message) {
@@ -135,6 +178,9 @@ function createHarness(projectRoot) {
     querySelector(selector) {
       return elements[selector] || null;
     },
+    querySelectorAll() {
+      return [];
+    },
     createElement(tagName) {
       return new FakeElement(tagName);
     },
@@ -156,6 +202,9 @@ function createHarness(projectRoot) {
     Promise,
     Set,
     Map,
+    navigator: {
+      userAgent: "node-smoke",
+    },
     addEventListener() {},
     setInterval(callback, delay) {
       const id = nextTimerId++;
@@ -173,12 +222,22 @@ function createHarness(projectRoot) {
     clearTimeout(id) {
       timers.delete(id);
     },
+    requestAnimationFrame(callback) {
+      return windowObject.setTimeout(() => callback(Date.now()), 16);
+    },
+    cancelAnimationFrame(id) {
+      windowObject.clearTimeout(id);
+    },
   };
   windowObject.window = windowObject;
+  windowObject.globalThis = windowObject;
 
   const context = vm.createContext(windowObject);
   const html = fs.readFileSync(path.join(projectRoot, "index.html"), "utf8");
-  const scriptPaths = [...html.matchAll(/<script\s+src="([^"]+)"><\/script>/g)].map((match) => match[1]);
+  const scriptPaths = [...html.matchAll(/<script\s+src="([^"]+)"><\/script>/g)]
+    .map((match) => match[1])
+    // Smoke 回归聚焦战斗/经济逻辑，Pixi 的浏览器集成由 browser:regression 覆盖。
+    .filter((scriptPath) => !scriptPath.includes("vendor/pixi.min.js"));
   assert(scriptPaths.length > 0, "index.html 没有找到脚本标签。");
 
   for (const relativePath of scriptPaths) {
@@ -648,7 +707,7 @@ function testKeywordCardsInPool(projectRoot) {
   assert(summary.warden.text.includes("复生、狂袭"), "墓窟看守者描述应同步体现复生与狂袭。");
   assert(summary.bastion.keywords.includes("barrier"), "铁甲壁垒应已接入壁垒关键词。");
   assert(summary.bastion.text.includes("壁垒"), "铁甲壁垒描述应显式写出壁垒。");
-  assert(summary.bastion.combatStart && summary.bastion.combatStart.includeSource === false, "铁甲壁垒的圣盾光环不应再作用于自身。");
+  assert(summary.bastion.combatStart && summary.bastion.combatStart.includeSource === false, "铁甲壁垒的护盾光环不应再作用于自身。");
 }
 
 function testCombatStartDealAllDamage(projectRoot) {
@@ -669,8 +728,8 @@ function testCombatStartDealAllDamage(projectRoot) {
   `);
   const summary = harness.run("__dealAllSummary");
   assert(summary.logs.some((line) => line.includes("对所有敌方随从造成了 1 点伤害")), "群体开战伤害应写入日志。");
-  assert(summary.logs.some((line) => line.includes("圣盾被打掉")), "群体开战伤害应能打掉圣盾。");
-  assert(summary.remainingEnemy.every((minion) => minion.name !== "护盾机器人"), "群体开战伤害后圣盾单位应不再保留圣盾。");
+  assert(summary.logs.some((line) => line.includes("护盾被打掉")), "群体开战伤害应能打掉护盾。");
+  assert(summary.remainingEnemy.every((minion) => minion.name !== "护盾机器人"), "群体开战伤害后护盾单位应不再保留护盾。");
 }
 
 function testBeastCombatStartBuff(projectRoot) {
@@ -706,8 +765,8 @@ function testMechGrantDivineShield(projectRoot) {
   `);
   const summary = harness.run("__mechShieldSummary");
   const ally = summary.remainingPlayer.find((minion) => minion.name === "产线机器人");
-  assert(summary.logs.some((line) => line.includes("施加了圣盾")), "机械授予圣盾应写入日志。");
-  assert(ally && ally.keywords.includes("divineShield"), "机械友军应获得圣盾。");
+  assert(summary.logs.some((line) => line.includes("施加了护盾")), "机械授予护盾应写入日志。");
+  assert(ally && ally.keywords.includes("divineShield"), "机械友军应获得护盾。");
 }
 
 function testDemonStackedBoardDamage(projectRoot) {
@@ -1019,6 +1078,140 @@ function testLobbyBattlePerspective(projectRoot) {
   assert(summary.playerBattle.logs.some((line) => line.includes("我方 人类守卫") || line.includes("敌方 兽人统领")), "战斗日志应以玩家视角记录双方。");
 }
 
+function testDwarfForgeBrand(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.phase = "prep";
+    state.hp = 30;
+    state.hand = [];
+    state.board = [createOwnedMinion("forge-apprentice")];
+    resolveLobbyPhaseEffects(state, "turnEnd", null, pickRandom, randomInt);
+    globalThis.__dwarfForgeSummary = state.hand.map((card) => ({
+      cardKind: card.cardKind,
+      id: card.id,
+      name: card.name,
+    }));
+  `);
+  const summary = harness.run("__dwarfForgeSummary");
+  assert(summary.length === 1, "矮人打造后应向手牌加入 1 张物品牌。");
+  assert(summary[0].cardKind === "brandSpell", "矮人打造出的牌应标记为法术型物品牌。");
+  assert(summary[0].id === "tempered-edge", "熔炉学徒应打造指定的淬火刀锋。");
+}
+
+function testBrandSpellCrossTribeUse(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.phase = "prep";
+    state.hp = 30;
+    state.hand = [createBrandCard("gyro-core")];
+    state.board = [createOwnedMinion("taunt-guard")];
+    playCardFromHandState(state, 0, { targetIndex: 0 });
+    globalThis.__brandUseSummary = {
+      handCount: state.hand.length,
+      target: {
+        tribe: state.board[0].tribe,
+        attack: state.board[0].attack,
+        health: state.board[0].health,
+        keywords: [...state.board[0].keywords],
+      },
+      message: state.message,
+    };
+  `);
+  const summary = harness.run("__brandUseSummary");
+  assert(summary.handCount === 0, "施放物品牌后应从手牌移除。");
+  assert(summary.target.tribe === "人类", "测试目标应保持原本种族，不应被物品牌改写。");
+  assert(summary.target.attack === 3 && summary.target.health === 3, "陀螺核心应为任意种族友军提供 +1/+1。");
+  assert(summary.target.keywords.includes("divineShield"), "物品牌应能为非矮人目标赋予护盾。");
+  assert(summary.message.includes("陀螺核心") && summary.message.includes("人类守卫"), "施法反馈文案应包含品牌名和目标名。");
+}
+
+function testBrandCastTriggersDwarfSynergy(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.phase = "prep";
+    state.hp = 30;
+    state.hand = [createBrandCard("tempered-edge")];
+    state.board = [createOwnedMinion("brand-quartermaster"), createOwnedMinion("assembly-chief"), createOwnedMinion("forge-apprentice")];
+    playCardFromHandState(state, 0, { targetIndex: 2 });
+    globalThis.__brandSynergySummary = state.board.map((minion) => ({
+      id: minion.id,
+      attack: minion.attack,
+      health: minion.health,
+    }));
+  `);
+  const summary = harness.run("__brandSynergySummary");
+  const quartermaster = summary.find((minion) => minion.id === "brand-quartermaster");
+  const chief = summary.find((minion) => minion.id === "assembly-chief");
+  const apprentice = summary.find((minion) => minion.id === "forge-apprentice");
+  assert(quartermaster && quartermaster.attack === 8 && quartermaster.health === 10, "品牌军需官在施放品牌后应先吃自身收益，再吃矮人群体增益。");
+  assert(chief && chief.attack === 5 && chief.health === 8, "装配总管在施放品牌后应被矮人群体增益命中。");
+  assert(apprentice && apprentice.attack === 5 && apprentice.health === 4, "被施法目标应同时吃到品牌本体和矮人联动增益。");
+}
+
+function testDwarfBrandDiscover(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    state.phase = "prep";
+    state.hp = 30;
+    state.hand = [];
+    state.board = [createOwnedMinion("vault-curator")];
+    resolveLobbyPhaseEffects(state, "turnEnd", null, pickRandom, randomInt);
+    globalThis.__brandDiscoverSummary = {
+      source: state.discover?.source || null,
+      title: state.discover?.title || "",
+      choiceKinds: state.discover?.choices?.map((card) => card.cardKind) || [],
+      choiceIds: state.discover?.choices?.map((card) => card.id) || [],
+    };
+  `);
+  const summary = harness.run("__brandDiscoverSummary");
+  assert(summary.source === "brandDiscover", "宝库监造官应打开物品牌发现界面。");
+  assert(summary.choiceKinds.length === 5 && summary.choiceKinds.every((kind) => kind === "brandSpell"), "物品牌发现应提供一组品牌法术选项。");
+  assert(summary.choiceIds.includes("storm-coil") && summary.choiceIds.includes("aegis-frame"), "高级品牌应进入发现池。");
+}
+
+function testActiveTribePoolPerRun(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const state = window.__AUTO_CHESS_TEST_API__.state;
+    globalThis.__activeTribeSummary = {
+      activeTribes: [...state.activeTribes],
+      nonNeutralCount: [...state.activeTribes].filter((tribe) => tribe !== "中立").length,
+      shopTribes: state.shop.map((minion) => minion.tribe),
+    };
+  `);
+  const summary = harness.run("__activeTribeSummary");
+  assert(summary.activeTribes.includes("中立"), "中立应始终在本局可用种族内。");
+  assert(summary.nonNeutralCount === 5, "新开一局应随机启用 5 个非中立种族。");
+  assert(summary.shopTribes.every((tribe) => summary.activeTribes.includes(tribe)), "商店不应刷出未激活种族。");
+}
+
+function testFilteredHighTierPoolAccess(projectRoot) {
+  const harness = createHarness(projectRoot);
+  harness.run(`
+    const active = new Set(["中立", "矮人", "机械", "恶魔", "野兽", "人类"]);
+    const preferHighestNumber = (candidates) =>
+      candidates.reduce((best, value) => {
+        const bestTier = typeof best === "number" ? best : best.tier;
+        const valueTier = typeof value === "number" ? value : value.tier;
+        return valueTier > bestTier ? value : best;
+      }, candidates[0]);
+    globalThis.__filteredPoolSummary = {
+      shop: generateShop(7, preferHighestNumber, active).map((minion) => minion.tribe),
+      enemy: generateEnemyBoard(20, preferHighestNumber, () => 0, active).map((minion) => minion.tribe),
+      reward: createTripleRewardChoices(6, preferHighestNumber, 4, active).map((minion) => minion.tribe),
+    };
+  `);
+  const summary = harness.run("__filteredPoolSummary");
+  const allowed = new Set(["中立", "矮人", "机械", "恶魔", "野兽", "人类"]);
+  assert(summary.shop.every((tribe) => allowed.has(tribe)), "过滤后的商店仍出现了未激活种族。");
+  assert(summary.enemy.every((tribe) => allowed.has(tribe)), "过滤后的敌方阵容仍出现了未激活种族。");
+  assert(summary.reward.every((tribe) => allowed.has(tribe)), "过滤后的奖励池仍出现了未激活种族。");
+}
+
 function main() {
   const projectRoot = path.resolve(__dirname, "..");
   const tests = [
@@ -1056,6 +1249,12 @@ function main() {
     ["deathrattle-buffs-friendlies", testDeathrattleBuffsFriendlies],
     ["turn-end-buffs-before-battle", testTurnEndBuffsBeforeBattle],
     ["lobby-battle-perspective", testLobbyBattlePerspective],
+    ["dwarf-forge-brand", testDwarfForgeBrand],
+    ["brand-spell-cross-tribe-use", testBrandSpellCrossTribeUse],
+    ["brand-cast-triggers-dwarf-synergy", testBrandCastTriggersDwarfSynergy],
+    ["dwarf-brand-discover", testDwarfBrandDiscover],
+    ["active-tribe-pool-per-run", testActiveTribePoolPerRun],
+    ["filtered-high-tier-pool-access", testFilteredHighTierPoolAccess],
   ];
 
   tests.forEach(([name, test]) => {

@@ -29,6 +29,26 @@ function applyCombatStartAbility(source, side, targets, player, enemy, logs, fra
   return resolveCombatStartAbility(context);
 }
 
+function createCombatStartCue(source) {
+  return [{ targetId: source.instanceId, type: "keyword", label: "开局效果" }];
+}
+
+function createCombatStartKeywordGrantCues(source, targets, keyword) {
+  const cues = createCombatStartCue(source);
+  if (keyword !== "divineShield") {
+    return cues;
+  }
+  return [
+    ...cues,
+    ...targets.map((minion) => ({
+      targetId: minion.instanceId,
+      type: "keyword",
+      label: "护盾",
+      label: "护盾",
+    })),
+  ];
+}
+
 function resolveCombatStartAbility(context) {
   const handlers = {
     "buff-adjacent": resolveBuffAdjacentCombatStart,
@@ -69,11 +89,13 @@ function resolveBuffAdjacentCombatStart(context) {
     frames,
     `${source.name} 在战斗开始时整顿阵形，使相邻友军获得了 +${attack}/+${health}。`,
     {
+      actionType: "combatStart",
       attackerId: source.instanceId,
       attackerSide: side,
       hitIds: adjacent.map((minion) => minion.instanceId),
+      cues: createCombatStartCue(source),
       progress,
-      delay: BATTLE_ACTION_DELAY_MS,
+      delay: BATTLE_COMBAT_START_ACTION_DELAY_MS,
     }
   );
   return true;
@@ -102,11 +124,13 @@ function resolveBuffRandomFriendlyCombatStart(context) {
     frames,
     `${source.name} 在战斗开始时挑选了 ${chosen.length} 个友军，赋予 +${attack}/+${health}。`,
     {
+      actionType: "combatStart",
       attackerId: source.instanceId,
       attackerSide: side,
       hitIds: chosen.map((minion) => minion.instanceId),
+      cues: createCombatStartCue(source),
       progress,
-      delay: BATTLE_ACTION_DELAY_MS,
+      delay: BATTLE_COMBAT_START_ACTION_DELAY_MS,
     }
   );
   return true;
@@ -139,12 +163,14 @@ function resolveRepeatedRandomDamageCombatStart(context, shots) {
         ? `${source.name} 在战斗开始时第 ${shot + 1} 次射击命中 ${target.name}，造成 ${amount} 点伤害。`
         : `${source.name} 在战斗开始时命中 ${target.name}，造成 ${amount} 点伤害。`;
     pushBattleLogFrame(player, enemy, logs, frames, message, {
+      actionType: "combatStart",
       attackerId: source.instanceId,
       defenderId: target.instanceId,
       attackerSide: side,
       defenderSide,
+      cues: createCombatStartCue(source),
       progress,
-      delay: BATTLE_ACTION_DELAY_MS,
+      delay: BATTLE_COMBAT_START_ACTION_DELAY_MS,
     });
     const note = applyDamage(target, amount, null, battleContext, {
       attackerId: source.instanceId,
@@ -154,13 +180,14 @@ function resolveRepeatedRandomDamageCombatStart(context, shots) {
       progress,
     });
     pushBattleFrameOnly(player, enemy, frames, {
+      actionType: "combatStart",
       attackerId: source.instanceId,
       defenderId: target.instanceId,
       attackerSide: side,
       defenderSide,
       hitIds: [target.instanceId],
       progress,
-      delay: BATTLE_HIT_DELAY_MS,
+      delay: BATTLE_COMBAT_START_HIT_DELAY_MS,
     });
     recordPostDamageEffects(note, target, player, enemy, logs, frames, {
       attackerId: source.instanceId,
@@ -196,11 +223,13 @@ function resolveBuffFriendlyTribeCombatStart(context) {
     frames,
     `${source.name} 在战斗开始时鼓舞了 ${friendlies.length} 个${source.combatStart.tribe}友军，赋予 +${attack}/+${health}。`,
     {
+      actionType: "combatStart",
       attackerId: source.instanceId,
       attackerSide: side,
       hitIds: friendlies.map((minion) => minion.instanceId),
+      cues: createCombatStartCue(source),
       progress,
-      delay: BATTLE_ACTION_DELAY_MS,
+      delay: BATTLE_COMBAT_START_ACTION_DELAY_MS,
     }
   );
   return true;
@@ -226,11 +255,13 @@ function resolveGainSelfPerFriendlyCombatStart(context) {
     frames,
     `${source.name} 在战斗开始时从 ${count} 个友军身上获得战意，得到 +${attack}/+${health}。`,
     {
+      actionType: "combatStart",
       attackerId: source.instanceId,
       attackerSide: side,
       hitIds: [source.instanceId],
+      cues: createCombatStartCue(source),
       progress,
-      delay: BATTLE_ACTION_DELAY_MS,
+      delay: BATTLE_COMBAT_START_ACTION_DELAY_MS,
     }
   );
   return true;
@@ -247,13 +278,15 @@ function resolveDealAllDamageCombatStart(context) {
   const defenderSide = side === "player" ? "enemy" : "player";
   const battleContext = { player, enemy, logs, frames };
   pushBattleLogFrame(player, enemy, logs, frames, `${source.name} 在战斗开始时对所有敌方随从造成了 ${amount} 点伤害。`, {
+    actionType: "combatStart",
     attackerId: source.instanceId,
     attackerSide: side,
     defenderSide,
     defenderId: livingTargets[0].instanceId,
     hitIds: livingTargets.map((minion) => minion.instanceId),
+    cues: createCombatStartCue(source),
     progress,
-    delay: BATTLE_ACTION_DELAY_MS,
+    delay: BATTLE_COMBAT_START_ACTION_DELAY_MS,
   });
 
   livingTargets.forEach((target) => {
@@ -274,13 +307,14 @@ function resolveDealAllDamageCombatStart(context) {
   });
 
   pushBattleFrameOnly(player, enemy, frames, {
+    actionType: "combatStart",
     attackerId: source.instanceId,
     attackerSide: side,
     defenderSide,
     defenderId: livingTargets[0].instanceId,
     hitIds: livingTargets.map((minion) => minion.instanceId),
     progress,
-    delay: BATTLE_HIT_DELAY_MS,
+    delay: BATTLE_COMBAT_START_HIT_DELAY_MS,
   });
   return true;
 }
@@ -306,11 +340,13 @@ function resolveGrantKeywordFriendlyTribeCombatStart(context) {
     frames,
     `${source.name} 在战斗开始时为 ${friendlies.length} 个${source.combatStart.tribe}友军施加了${getKeywordLabel(keyword)}。`,
     {
+      actionType: "combatStart",
       attackerId: source.instanceId,
       attackerSide: side,
       hitIds: friendlies.map((minion) => minion.instanceId),
+      cues: createCombatStartCue(source),
       progress,
-      delay: BATTLE_ACTION_DELAY_MS,
+      delay: BATTLE_COMBAT_START_ACTION_DELAY_MS,
     }
   );
   return true;
@@ -337,11 +373,13 @@ function resolveGrantKeywordAdjacentCombatStart(context) {
     frames,
     `${source.name} 在战斗开始时为相邻友军施加了${getKeywordLabel(keyword)}。`,
     {
+      actionType: "combatStart",
       attackerId: source.instanceId,
       attackerSide: side,
       hitIds: adjacent.map((minion) => minion.instanceId),
+      cues: createCombatStartKeywordGrantCues(source, adjacent, keyword),
       progress,
-      delay: BATTLE_ACTION_DELAY_MS,
+      delay: BATTLE_COMBAT_START_ACTION_DELAY_MS,
     }
   );
   return true;

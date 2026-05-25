@@ -19,10 +19,11 @@ function createTripleRewardCard(rewardTier) {
   };
 }
 
-function createTripleRewardChoices(rewardTier, pickRandomFn = null, count = 4) {
+function createTripleRewardChoices(rewardTier, pickRandomFn = null, count = 4, activeTribes = null) {
   const effectiveTier = Math.max(1, Math.min(CONTENT_TIER_CAP, rewardTier));
-  const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier === effectiveTier);
-  const fallback = MINION_POOL.filter((minion) => !minion.token && minion.tier <= effectiveTier);
+  const pool = getAvailablePool(activeTribes);
+  const candidates = pool.filter((minion) => minion.tier === effectiveTier);
+  const fallback = pool.filter((minion) => minion.tier <= effectiveTier);
   const source = (candidates.length ? candidates : fallback).slice();
   const choices = [];
 
@@ -82,27 +83,28 @@ function buyMinionToZoneState(state, shopIndex, targetZone = "hand", targetIndex
   return true;
 }
 
-function generateShop(maxTier, pickRandom) {
+function generateShop(maxTier, pickRandom, activeTribes = null) {
   const effectiveTier = Math.min(maxTier, CONTENT_TIER_CAP);
-  return Array.from({ length: SHOP_SLOTS }, () => cloneTemplate(pickShopMinion(effectiveTier, pickRandom)));
+  return Array.from({ length: SHOP_SLOTS }, () => cloneTemplate(pickShopMinion(effectiveTier, pickRandom, activeTribes)));
 }
 
-function refillShop(currentShop, maxTier, pickRandom) {
+function refillShop(currentShop, maxTier, pickRandom, activeTribes = null) {
   const filledShop = currentShop.map(cloneTemplate);
   const missing = Math.max(0, SHOP_SLOTS - filledShop.length);
   if (missing === 0) {
     return filledShop;
   }
-  return [...filledShop, ...generateShop(maxTier, pickRandom).slice(0, missing)];
+  return [...filledShop, ...generateShop(maxTier, pickRandom, activeTribes).slice(0, missing)];
 }
 
-function pickShopMinion(effectiveTier, pickRandom) {
+function pickShopMinion(effectiveTier, pickRandom, activeTribes = null) {
   const tier = pickTierByOdds(SHOP_TIER_ODDS[effectiveTier], pickRandom);
-  const candidates = MINION_POOL.filter((minion) => !minion.token && minion.tier === tier);
+  const pool = getAvailablePool(activeTribes);
+  const candidates = pool.filter((minion) => minion.tier === tier);
   if (candidates.length) {
     return pickRandom(candidates);
   }
-  const fallback = MINION_POOL.filter((minion) => !minion.token && minion.tier <= effectiveTier);
+  const fallback = pool.filter((minion) => minion.tier <= effectiveTier);
   return pickRandom(fallback);
 }
 
@@ -116,4 +118,8 @@ function pickTierByOdds(odds, pickRandom) {
     }
   });
   return pickRandom(bag);
+}
+
+function getAvailablePool(activeTribes) {
+  return filterMinionsByActiveTribes(MINION_POOL.filter((minion) => !minion.token), activeTribes);
 }

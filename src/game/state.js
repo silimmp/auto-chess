@@ -7,6 +7,8 @@ function createElements() {
     phase: document.querySelector("#phase-value"),
     timer: document.querySelector("#timer-value"),
     timerCard: document.querySelector("#timer-card"),
+    activeTribesCard: document.querySelector("#active-tribes-card"),
+    activeTribesList: document.querySelector("#active-tribes-list"),
     message: document.querySelector("#message-value"),
     shop: document.querySelector("#shop-board"),
     shopOdds: document.querySelector("#shop-odds-value"),
@@ -27,6 +29,8 @@ function createElements() {
     battleTurnPill: document.querySelector("#battle-turn-pill"),
     battleProgressLabel: document.querySelector("#battle-progress-label"),
     battleSummaryText: document.querySelector("#battle-summary-text"),
+    battleDebugCaptureBtn: document.querySelector("#battle-debug-capture-btn"),
+    battleDebugStatus: document.querySelector("#battle-debug-status"),
     lobbyAlive: document.querySelector("#lobby-alive-value"),
     lobbyPlace: document.querySelector("#lobby-place-value"),
     lobbyOpponent: document.querySelector("#lobby-opponent-value"),
@@ -50,7 +54,8 @@ function createPrepZones(elements) {
 }
 
 function createInitialState(generateShop, generateEnemyBoard, pickRandom, randomInt) {
-  const lobby = createInitialLobby(generateEnemyBoard, pickRandom, randomInt);
+  const activeTribes = createActiveTribeSet(pickRandom);
+  const lobby = createInitialLobby(generateEnemyBoard, pickRandom, randomInt, activeTribes);
   const currentOpponent = getLobbyPlayerById(lobby, lobby.currentOpponentId);
   const initial = {
     turn: 1,
@@ -63,6 +68,7 @@ function createInitialState(generateShop, generateEnemyBoard, pickRandom, random
     timeLeft: getPrepDuration(1),
     prepEndsAt: null,
     shopFrozen: false,
+    activeTribes,
     shop: [],
     hand: [],
     board: [],
@@ -84,8 +90,8 @@ function createInitialState(generateShop, generateEnemyBoard, pickRandom, random
     message: getPrepStartMessage(1),
   };
 
-  initial.shop = generateShop(initial.tavernTier, pickRandom);
-  resolveLobbyPhaseEffects(initial, "turnStart", generateEnemyBoard, pickRandom, randomInt);
+  initial.shop = generateShop(initial.tavernTier, pickRandom, initial.activeTribes);
+  resolveLobbyPhaseEffects(initial, "turnStart", (turn, nextPickRandom, nextRandomInt) => generateEnemyBoard(turn, nextPickRandom, nextRandomInt, initial.activeTribes), pickRandom, randomInt);
   initial.enemyBoard = currentOpponent ? currentOpponent.board.map(copyMinion) : [];
   return initial;
 }
@@ -96,11 +102,21 @@ function createBattleAnimationState() {
     isAnimating: false,
     playerBoard: [],
     enemyBoard: [],
+    previousPlayerBoard: [],
+    previousEnemyBoard: [],
+    actionType: "",
+    attackKeyword: "",
     attackerId: null,
     defenderId: null,
+    effectSourceId: null,
     attackerSide: "",
     defenderSide: "",
+    focusAttackerId: null,
+    focusDefenderId: null,
+    focusAttackerSide: "",
+    focusDefenderSide: "",
     hitIds: [],
+    hitEffects: [],
     defeatedIds: [],
     cues: [],
     progressLabel: "等待开战",

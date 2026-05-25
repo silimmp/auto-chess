@@ -33,6 +33,7 @@ jobs:
           mkdir -p dist
           cp index.html dist/
           cp styles.css dist/
+          cp -r vendor dist/
           cp -r src dist/
 
       - name: Upload Pages artifact

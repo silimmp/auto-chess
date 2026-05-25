@@ -48,6 +48,9 @@ function resolveBoardPhaseAbility(board, source, field, pickRandomFn) {
     "buff-random-friendly": resolveBoardPhaseBuffRandomFriendly,
     "buff-friendly-tribe": resolveBoardPhaseBuffFriendlyTribe,
     "gain-self-per-friendly": resolveBoardPhaseGainSelfPerFriendly,
+    "forge-brand": resolveBoardPhaseForgeBrand,
+    "forge-brand-random": resolveBoardPhaseForgeBrandRandom,
+    "forge-brand-discover": resolveBoardPhaseForgeBrandDiscover,
   };
   const handler = handlers[ability.type];
   if (!handler) {
@@ -117,6 +120,67 @@ function resolveBoardPhaseGainSelfPerFriendly(board, source, ability, field) {
   return `${source.name}${getBoardPhaseLabel(field)}获得了 +${attack}/+${health}`;
 }
 
+function resolveBoardPhaseForgeBrand(board, source, ability, field) {
+  if (!ability.brandId || typeof createBrandCard !== "function") {
+    return "";
+  }
+  const ownerState = getBoardOwnerState(board);
+  if (!ownerState || !Array.isArray(ownerState.hand)) {
+    return "";
+  }
+  if (ownerState.hand.length >= HAND_LIMIT) {
+    return `${source.name}${getBoardPhaseLabel(field)}尝试打造品牌，但手牌已满。`;
+  }
+
+  const brandCard = createBrandCard(ability.brandId);
+  if (!brandCard) {
+    return "";
+  }
+  ownerState.hand.push(brandCard);
+  return `${source.name}${getBoardPhaseLabel(field)}打造了 ${brandCard.name}`;
+}
+
+function resolveBoardPhaseForgeBrandRandom(board, source, ability, field, pickRandomFn) {
+  const brandIds = Array.isArray(ability.brandIds) ? ability.brandIds.filter(Boolean) : [];
+  if (!brandIds.length || typeof createBrandCard !== "function") {
+    return "";
+  }
+  const ownerState = getBoardOwnerState(board);
+  if (!ownerState || !Array.isArray(ownerState.hand)) {
+    return "";
+  }
+  if (ownerState.hand.length >= HAND_LIMIT) {
+    return `${source.name}${getBoardPhaseLabel(field)}尝试打造品牌，但手牌已满。`;
+  }
+
+  const brandId = pickRandomFn(brandIds);
+  const brandCard = createBrandCard(brandId);
+  if (!brandCard) {
+    return "";
+  }
+  ownerState.hand.push(brandCard);
+  return `${source.name}${getBoardPhaseLabel(field)}随机打造了 ${brandCard.name}`;
+}
+
+function resolveBoardPhaseForgeBrandDiscover(board, source, ability, field) {
+  const brandIds = Array.isArray(ability.brandIds) ? ability.brandIds.filter(Boolean) : [];
+  if (!brandIds.length || typeof createBrandCard !== "function") {
+    return "";
+  }
+  const ownerState = getBoardOwnerState(board);
+  if (!ownerState) {
+    return "";
+  }
+
+  ownerState.discover = {
+    source: "brandDiscover",
+    title: "选择一张物品牌",
+    subtitle: "从这些高级物品牌中选择一张加入手牌。",
+    choices: brandIds.map((brandId) => createBrandCard(brandId)).filter(Boolean),
+  };
+  return `${source.name}${getBoardPhaseLabel(field)}开启了高级物品牌发现`;
+}
+
 function getBoardFriendlyTargets(board, source, ability) {
   const includeSource = Boolean(ability.includeSource);
   return board.filter((minion) => {
@@ -163,4 +227,16 @@ function pickUniqueBoardMinions(candidates, count, pickRandomFn) {
 
 function getBoardPhaseLabel(field) {
   return field === "turnStart" ? " 在回合开始时 " : " 在回合结束时 ";
+}
+
+function getBoardOwnerState(board) {
+  if (!window?.__AUTO_CHESS_TEST_API__?.state) {
+    return null;
+  }
+  const state = window.__AUTO_CHESS_TEST_API__.state;
+  if (state.board === board) {
+    return state;
+  }
+  const player = state.lobby?.players?.find((entry) => entry.board === board);
+  return player || null;
 }

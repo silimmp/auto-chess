@@ -20,6 +20,7 @@ function createDragState() {
     cachedRects: null,
     dragRect: null,
     frameRequested: false,
+    previewMode: "",
   };
 }
 
@@ -189,17 +190,26 @@ function activateDrag() {
   }
 
   const rect = dragRuntime.dragState.sourceElement.getBoundingClientRect();
-  const preview = dragRuntime.dragState.sourceElement.cloneNode(true);
+  const isBrandSpell = dragRuntime.dragState.sourceElement.classList.contains("brand-card");
+  const preview = isBrandSpell ? createArrowPreview() : dragRuntime.dragState.sourceElement.cloneNode(true);
   preview.classList.add("drag-preview");
-  preview.style.width = `${rect.width}px`;
-  preview.style.height = `${rect.height}px`;
-  preview.style.left = "0";
-  preview.style.top = "0";
-  preview.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0) rotate(-1deg) scale(1.04)`;
+  if (isBrandSpell) {
+    preview.classList.add("drag-preview-arrow");
+    preview.style.inset = "0";
+    preview.style.width = "100vw";
+    preview.style.height = "100vh";
+  } else {
+    preview.style.width = `${rect.width}px`;
+    preview.style.height = `${rect.height}px`;
+    preview.style.left = "0";
+    preview.style.top = "0";
+    preview.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0) rotate(-1deg) scale(1.04)`;
+  }
   document.body.appendChild(preview);
 
   dragRuntime.dragState.status = "active";
   dragRuntime.dragState.previewElement = preview;
+  dragRuntime.dragState.previewMode = isBrandSpell ? "arrow" : "card";
   dragRuntime.dragState.offsetX = dragRuntime.dragState.startX - rect.left;
   dragRuntime.dragState.offsetY = dragRuntime.dragState.startY - rect.top;
   dragRuntime.dragState.dragRect = snapshotRect(rect);
@@ -222,9 +232,90 @@ function updateDragPreviewPosition(clientX, clientY) {
     return;
   }
 
+  if (dragRuntime.dragState.previewMode === "arrow") {
+    updateArrowPreviewShape(clientX, clientY);
+    return;
+  }
+
   const x = clientX - dragRuntime.dragState.offsetX;
   const y = clientY - dragRuntime.dragState.offsetY;
   dragRuntime.dragState.previewElement.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(-1deg) scale(1.04)`;
+}
+
+function createArrowPreview() {
+  const preview = document.createElement("div");
+  preview.innerHTML = `
+    <svg class="drag-preview-arrow-svg" aria-hidden="true">
+      <path class="drag-preview-arrow-shadow" d=""></path>
+      <path class="drag-preview-arrow-core" d=""></path>
+      <path class="drag-preview-arrow-head" d=""></path>
+    </svg>
+    <div class="drag-preview-arrow-label"></div>
+  `;
+  return preview;
+}
+
+function updateArrowPreviewShape(clientX, clientY) {
+  const preview = dragRuntime.dragState.previewElement;
+  if (!preview) {
+    return;
+  }
+
+  const svg = preview.querySelector(".drag-preview-arrow-svg");
+  const shadow = preview.querySelector(".drag-preview-arrow-shadow");
+  const core = preview.querySelector(".drag-preview-arrow-core");
+  const head = preview.querySelector(".drag-preview-arrow-head");
+  const label = preview.querySelector(".drag-preview-arrow-label");
+  const sourceRect = dragRuntime.dragState.sourceElement?.getBoundingClientRect() || dragRuntime.dragState.dragRect;
+  if (!svg || !shadow || !core || !head || !sourceRect) {
+    return;
+  }
+
+  svg.setAttribute("viewBox", `0 0 ${window.innerWidth} ${window.innerHeight}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("width", String(window.innerWidth));
+  svg.setAttribute("height", String(window.innerHeight));
+
+  const sourceX = sourceRect.left + sourceRect.width / 2;
+  const sourceY = sourceRect.top + sourceRect.height * 0.44;
+  const deltaX = clientX - sourceX;
+  const deltaY = clientY - sourceY;
+  const distance = Math.max(1, Math.hypot(deltaX, deltaY));
+  const bend = clampArrowBend(distance);
+  const control1X = sourceX + deltaX * 0.25;
+  const control1Y = sourceY + Math.sign(deltaY || 1) * bend;
+  const control2X = clientX - deltaX * 0.18;
+  const control2Y = clientY - Math.sign(deltaY || 1) * bend * 0.72;
+  const arrowHead = buildArrowHeadGeometry(control2X, control2Y, clientX, clientY);
+  const path = `M ${sourceX} ${sourceY} C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${arrowHead.shaftX} ${arrowHead.shaftY}`;
+
+  shadow.setAttribute("d", path);
+  core.setAttribute("d", path);
+  head.setAttribute("d", arrowHead.path);
+  label.textContent = dragRuntime.dragState.sourceElement?.querySelector(".minion-name")?.textContent || "";
+  preview.style.setProperty("--arrow-source-x", `${sourceX}px`);
+  preview.style.setProperty("--arrow-source-y", `${sourceY}px`);
+}
+
+function clampArrowBend(distance) {
+  return Math.max(24, Math.min(88, distance * 0.16));
+}
+
+function buildArrowHeadGeometry(fromX, fromY, tipX, tipY) {
+  const angle = Math.atan2(tipY - fromY, tipX - fromX);
+  const headLength = 20;
+  const headWidth = 11;
+  const backX = tipX - Math.cos(angle) * headLength;
+  const backY = tipY - Math.sin(angle) * headLength;
+  const leftX = backX + Math.cos(angle + Math.PI / 2) * headWidth;
+  const leftY = backY + Math.sin(angle + Math.PI / 2) * headWidth;
+  const rightX = backX + Math.cos(angle - Math.PI / 2) * headWidth;
+  const rightY = backY + Math.sin(angle - Math.PI / 2) * headWidth;
+  return {
+    path: `M ${tipX} ${tipY} L ${leftX} ${leftY} L ${rightX} ${rightY} Z`,
+    shaftX: backX,
+    shaftY: backY,
+  };
 }
 
 function updateDropTargetState(clientX, clientY) {
@@ -483,6 +574,7 @@ function cleanupDragState() {
   dragRuntime.dragState.sourceElement?.classList.remove("touch-press-armed");
   dragRuntime.dragState.sourceElement?.classList.remove("drag-source");
   dragRuntime.dragState.previewElement?.remove();
+  dragRuntime.dragState.previewMode = "";
   Object.entries(dragRuntime.prepZones).forEach(([key, element]) => {
     if (key === "shared") {
       element?.classList.remove("drop-target");

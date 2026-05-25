@@ -41,7 +41,7 @@ const MINION_POOL = [
     health: 2,
     keywords: ["divineShield", "deathrattle"],
     deathrattle: { type: "buff-friendly-tribe", tribe: "机械", attack: 0, health: 1 },
-    text: "圣盾。亡语：使你的机械获得 +0/+1。",
+    text: "护盾。亡语：使你的机械获得 +0/+1。",
   },
   {
     id: "taunt-guard",
@@ -168,7 +168,7 @@ const MINION_POOL = [
     health: 3,
     keywords: ["divineShield"],
     combatStart: { type: "grant-keyword-adjacent", keyword: "divineShield" },
-    text: "圣盾。战斗开始时：使相邻友军获得圣盾。",
+    text: "护盾。战斗开始时：使相邻友军获得护盾。",
   },
   {
     id: "dire-guardian",
@@ -505,7 +505,7 @@ const MINION_POOL = [
     health: 3,
     keywords: ["divineShield"],
     combatStart: { type: "buff-adjacent", tribe: "机械", attack: 1, health: 1 },
-    text: "圣盾。战斗开始时：使相邻的机械获得 +1/+1。",
+    text: "护盾。战斗开始时：使相邻的机械获得 +1/+1。",
   },
   {
     id: "oath-knight",
@@ -516,7 +516,7 @@ const MINION_POOL = [
     health: 4,
     keywords: ["divineShield"],
     combatStart: { type: "grant-keyword-adjacent", tribe: "人类", keyword: "provoke" },
-    text: "圣盾。战斗开始时：使相邻的人类获得挑衅。",
+    text: "护盾。战斗开始时：使相邻的人类获得挑衅。",
   },
   {
     id: "grave-lord",
@@ -621,7 +621,7 @@ const MINION_POOL = [
     health: 3,
     keywords: ["divineShield"],
     combatStart: { type: "grant-keyword-adjacent", tribe: "机械", keyword: "divineShield" },
-    text: "圣盾。战斗开始时：使相邻的机械获得圣盾。",
+    text: "护盾。战斗开始时：使相邻的机械获得护盾。",
   },
   {
     id: "thorn-guard",
@@ -772,7 +772,7 @@ const MINION_POOL = [
       health: 0,
       includeSource: false,
     },
-    text: "溅射（额外对相邻随从造成 1 点伤害）、嘲讽。受伤后：使其他野兽获得 +1 攻击力。",
+    text: "溅射、嘲讽。受伤后：使其他野兽获得 +1 攻击力。",
   },
   {
     id: "hellfire-magus",
@@ -799,7 +799,7 @@ const MINION_POOL = [
       keyword: "divineShield",
       includeSource: false,
     },
-    text: "壁垒。战斗开始时：使你的其他机械获得圣盾。",
+    text: "壁垒。战斗开始时：使你的其他机械获得护盾。",
   },
   {
     id: "kingsguard-marshal",
@@ -930,7 +930,7 @@ const MINION_POOL = [
       keyword: "divineShield",
       includeSource: false,
     },
-    text: "圣盾。战斗开始时：使你的其他人类获得圣盾。",
+    text: "护盾。战斗开始时：使你的其他人类获得护盾。",
   },
   {
     id: "ironhide-warlord",
@@ -1003,7 +1003,7 @@ const MINION_POOL = [
     health: 11,
     keywords: ["divineShield", "deathrattle"],
     deathrattle: { type: "deal-random-damage", amount: 4, shots: 2 },
-    text: "圣盾。亡语：随机对敌方随从造成 4 点伤害两次。",
+    text: "护盾。亡语：随机对敌方随从造成 4 点伤害两次。",
   },
   {
     id: "imperial-paragon",
@@ -1070,6 +1070,118 @@ const MINION_POOL = [
     text: "战斗开始时：随机对敌方随从造成 4 点伤害三次。",
   },
   {
+    id: "forge-apprentice",
+    name: "熔炉学徒",
+    tier: 1,
+    tribe: "矮人",
+    attack: 2,
+    health: 3,
+    keywords: [],
+    turnEnd: { type: "forge-brand", brandId: "tempered-edge" },
+    text: "回合结束时：打造一张“淬火刀锋”置入手牌。",
+  },
+  {
+    id: "anvil-keeper",
+    name: "铁砧护匠",
+    tier: 2,
+    tribe: "矮人",
+    attack: 2,
+    health: 4,
+    keywords: ["taunt"],
+    turnStart: { type: "forge-brand", brandId: "bulwark-plate" },
+    text: "嘲讽。回合开始时：打造一张“壁垒胸甲”置入手牌。",
+  },
+  {
+    id: "runed-smith",
+    name: "符文工匠",
+    tier: 3,
+    tribe: "矮人",
+    attack: 4,
+    health: 4,
+    keywords: [],
+    turnEnd: { type: "forge-brand", brandId: "gyro-core" },
+    text: "回合结束时：打造一张“陀螺核心”置入手牌。",
+  },
+  {
+    id: "grand-artificer",
+    name: "大工艺师",
+    tier: 4,
+    tribe: "矮人",
+    attack: 4,
+    health: 6,
+    keywords: [],
+    turnEnd: { type: "forge-brand-random", brandIds: ["tempered-edge", "bulwark-plate", "gyro-core"] },
+    text: "回合结束时：随机打造一张物品牌置入手牌。",
+  },
+  {
+    id: "powder-kegger",
+    name: "火药桶匠",
+    tier: 4,
+    tribe: "矮人",
+    attack: 5,
+    health: 5,
+    keywords: [],
+    turnEnd: { type: "forge-brand", brandId: "blast-keg" },
+    text: "回合结束时：打造一张“爆破火药桶”置入手牌。",
+  },
+  {
+    id: "brand-quartermaster",
+    name: "品牌军需官",
+    tier: 5,
+    tribe: "矮人",
+    attack: 5,
+    health: 7,
+    keywords: [],
+    brandCastTrigger: { type: "buff-self-when-brand-cast", attack: 2, health: 2 },
+    text: "每当你施放一个物品牌，获得 +2/+2。",
+  },
+  {
+    id: "assembly-chief",
+    name: "装配总管",
+    tier: 5,
+    tribe: "矮人",
+    attack: 4,
+    health: 7,
+    keywords: [],
+    brandCastTrigger: { type: "buff-friendly-tribe-when-brand-cast", tribe: "矮人", attack: 1, health: 1, includeSource: true },
+    text: "每当你施放一个物品牌，使你的矮人获得 +1/+1。",
+  },
+  {
+    id: "runeforge-master",
+    name: "符钢宗师",
+    tier: 6,
+    tribe: "矮人",
+    attack: 6,
+    health: 8,
+    keywords: [],
+    turnStart: { type: "forge-brand-random", brandIds: ["tempered-edge", "bulwark-plate", "gyro-core", "blast-keg", "echo-hammer"] },
+    brandCastTrigger: { type: "buff-self-when-brand-cast", attack: 1, health: 1 },
+    text: "回合开始时：随机打造一张高级物品牌置入手牌。每当你施放一个物品牌，获得 +1/+1。",
+  },
+  {
+    id: "high-king-engineer",
+    name: "矮人机巧王",
+    tier: 7,
+    tribe: "矮人",
+    attack: 8,
+    health: 10,
+    keywords: [],
+    turnEnd: { type: "forge-brand-random", brandIds: ["gyro-core", "blast-keg", "echo-hammer"] },
+    brandCastTrigger: { type: "buff-random-friendly-when-brand-cast", count: 2, attack: 2, health: 2 },
+    text: "回合结束时：随机打造一张强力物品牌。每当你施放一个物品牌，随机使 2 个友军获得 +2/+2。",
+  },
+  {
+    id: "vault-curator",
+    name: "宝库监造官",
+    tier: 6,
+    tribe: "矮人",
+    attack: 6,
+    health: 9,
+    keywords: [],
+    turnEnd: { type: "forge-brand-discover", brandIds: ["gyro-core", "blast-keg", "echo-hammer", "aegis-frame", "storm-coil"] },
+    text: "回合结束时：发现一张高级物品牌。",
+  },
+  {
     id: "skeleton-soldier",
     name: "骸骨步卒",
     tier: 1,
@@ -1094,6 +1206,66 @@ const MINION_POOL = [
 ];
 
 const byId = new Map(MINION_POOL.map((minion) => [minion.id, minion]));
+const BRAND_POOL = [
+  {
+    id: "tempered-edge",
+    name: "淬火刀锋",
+    tribe: "矮人",
+    text: "物品牌。法术。使一个友方随从获得 +2 攻击力。",
+    meta: "物品牌",
+    effect: { type: "buff-minion", attack: 2, health: 0, addKeywords: [] },
+  },
+  {
+    id: "bulwark-plate",
+    name: "壁垒胸甲",
+    tribe: "矮人",
+    text: "物品牌。法术。使一个友方随从获得 +0/+3 和 嘲讽。",
+    meta: "物品牌",
+    effect: { type: "buff-minion", attack: 0, health: 3, addKeywords: ["taunt"] },
+  },
+  {
+    id: "gyro-core",
+    name: "陀螺核心",
+    tribe: "矮人",
+    text: "物品牌。法术。使一个友方随从获得 +1/+1 和 护盾。",
+    meta: "物品牌",
+    effect: { type: "buff-minion", attack: 1, health: 1, addKeywords: ["divineShield"] },
+  },
+  {
+    id: "blast-keg",
+    name: "爆破火药桶",
+    tribe: "矮人",
+    text: "物品牌。法术。使一个友方随从获得 +3/+0 和 狂袭。",
+    meta: "物品牌",
+    effect: { type: "buff-minion", attack: 3, health: 0, addKeywords: ["assault"] },
+  },
+  {
+    id: "echo-hammer",
+    name: "回响战锤",
+    tribe: "矮人",
+    text: "物品牌。法术。使一个友方随从获得 +2/+2 和 连击。",
+    meta: "物品牌",
+    effect: { type: "buff-minion", attack: 2, health: 2, addKeywords: ["combo"] },
+  },
+  {
+    id: "aegis-frame",
+    name: "神盾框架",
+    tribe: "矮人",
+    text: "物品牌。法术。使一个友方随从获得 +2/+4 和 壁垒。",
+    meta: "物品牌",
+    effect: { type: "buff-minion", attack: 2, health: 4, addKeywords: ["barrier"] },
+  },
+  {
+    id: "storm-coil",
+    name: "风暴线圈",
+    tribe: "矮人",
+    text: "物品牌。法术。使一个友方随从获得 +4/+1 和 溅射。",
+    meta: "物品牌",
+    effect: { type: "buff-minion", attack: 4, health: 1, addKeywords: ["splash"] },
+  },
+];
+const brandById = new Map(BRAND_POOL.map((brand) => [brand.id, brand]));
+const NON_NEUTRAL_TRIBES = [...new Set(MINION_POOL.map((minion) => minion.tribe).filter((tribe) => tribe && tribe !== ALWAYS_AVAILABLE_TRIBE))];
 
 let nextInstanceId = 1;
 
@@ -1153,4 +1325,55 @@ function createGoldenMinion(base) {
     golden: true,
     instanceId: nextInstanceId++,
   };
+}
+
+function createBrandSnapshot(brand, runtimeFields = {}) {
+  return {
+    cardKind: "brandSpell",
+    id: brand.id,
+    name: brand.name,
+    tribe: brand.tribe,
+    tier: 0,
+    text: brand.text,
+    meta: brand.meta || "物品牌",
+    effect: {
+      type: brand.effect.type,
+      attack: brand.effect.attack ?? 0,
+      health: brand.effect.health ?? 0,
+      addKeywords: [...(brand.effect.addKeywords || [])],
+    },
+    instanceId: runtimeFields.instanceId ?? brand.instanceId ?? null,
+  };
+}
+
+function createBrandCard(id) {
+  const template = brandById.get(id);
+  if (!template) {
+    return null;
+  }
+  return {
+    ...createBrandSnapshot(template),
+    instanceId: nextInstanceId++,
+  };
+}
+
+function createActiveTribeSet(pickRandomFn = null, count = RANDOM_LOBBY_TRIBE_COUNT) {
+  const pool = [...NON_NEUTRAL_TRIBES];
+  const active = new Set([ALWAYS_AVAILABLE_TRIBE]);
+  const targetCount = Math.min(count, pool.length);
+
+  while (pool.length && active.size - 1 < targetCount) {
+    const picked = typeof pickRandomFn === "function" ? pickRandomFn(pool) : pool[0];
+    active.add(picked);
+    pool.splice(pool.indexOf(picked), 1);
+  }
+
+  return active;
+}
+
+function filterMinionsByActiveTribes(minions, activeTribes) {
+  if (!(activeTribes instanceof Set) || activeTribes.size === 0) {
+    return minions.slice();
+  }
+  return minions.filter((minion) => activeTribes.has(minion.tribe));
 }

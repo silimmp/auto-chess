@@ -91,6 +91,10 @@
                 <div class="panel-kicker">招募倒计时</div>
                 <strong id="timer-value" class="timer-value">15s</strong>
               </section>
+              <section id="active-tribes-card" class="active-tribes-card" aria-label="本局可用种族">
+                <div class="panel-kicker">本局种族</div>
+                <div id="active-tribes-list" class="active-tribes-list"></div>
+              </section>
               <div class="top-actions">
                 <button id="upgrade-btn" class="action-btn accent">升级商店</button>
                 <button id="refresh-btn" class="action-btn">刷新</button>
@@ -98,14 +102,14 @@
               </div>
             </div>
 
-            <div class="prep-shared-body prep-battle-stack">
-              <div class="prep-shop-zone">
-                <div id="shop-board" class="card-row shop-row"></div>
-              </div>
+              <div class="prep-shared-body prep-battle-stack">
+                <div class="prep-shop-zone">
+                  <div id="shop-board" class="card-row shop-row"></div>
+                </div>
 
-              <div class="prep-board-zone">
-                <div id="player-board" class="card-row board-row"></div>
-              </div>
+                <div class="prep-board-zone">
+                  <div id="player-board" class="card-row board-row"></div>
+                </div>
 
               <div class="prep-hand-zone">
                 <div class="hand-tray-hotspot" aria-hidden="true"></div>
@@ -137,6 +141,10 @@
               <div id="battle-turn-pill" class="battle-turn-pill">第 1 回合</div>
               <div id="battle-progress-label" class="battle-progress-label">等待开战</div>
               <div id="battle-summary-text" class="battle-summary-text">战斗即将开始。</div>
+              <div class="battle-debug-controls">
+                <button id="battle-debug-capture-btn" type="button" class="battle-debug-btn">抓取抽搐上下文</button>
+                <div id="battle-debug-status" class="battle-debug-status">按钮会抓取最近一段战斗上下文。</div>
+              </div>
             </div>
             <div class="battle-topbar-side player">
               <div class="battle-topbar-label">你的战队</div>
@@ -146,6 +154,7 @@
           </div>
           <div class="battle-stage battle-stage-full">
             <div class="battle-arena battle-arena-full">
+              <div id="battle-vfx-layer" class="battle-vfx-layer" aria-hidden="true"></div>
               <div class="battle-side">
                 <div class="battle-side-label">对手战队</div>
                 <div id="battle-enemy-board" class="card-row battle-board"></div>
@@ -177,9 +186,12 @@
     <script src="./src/game/roundEffects.js"></script>
     <script src="./src/game/progression.js"></script>
     <script src="./src/game/state.js"></script>
+    <script src="./src/debug/battleDebug.js"></script>
     <script src="./src/ui/cards.js"></script>
     <script src="./src/ui/drag.js"></script>
     <script src="./src/ui/render.js"></script>
+    <script src="./vendor/pixi.min.js"></script>
+    <script src="./src/vfx/battleEffects.js"></script>
     <script src="./src/main.js"></script>
   </body>
 </html>

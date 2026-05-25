@@ -51,6 +51,7 @@ function resolveBuffFriendlyTribeWhenDamaged(target, player, enemy, logs, frames
     `${target.name} 受伤后激励了 ${friendlies.length} 个友军，赋予 +${attack}/+${health}。`,
     {
       ...options,
+      actionType: "cue",
       hitIds: friendlies.map((minion) => minion.instanceId),
       delay: BATTLE_HIT_DELAY_MS,
     }
@@ -130,6 +131,7 @@ function resolveGainStatsWhenDamaged(target, player, enemy, logs, frames, option
 
   pushBattleLogFrame(player, enemy, logs, frames, `${target.name} 受伤后激怒，获得了 +${attack}/+${health}。`, {
     ...options,
+    actionType: "cue",
     hitIds: [target.instanceId],
     delay: BATTLE_HIT_DELAY_MS,
   });

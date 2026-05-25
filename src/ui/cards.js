@@ -2,24 +2,26 @@ function buildMinionCard(minion, options = {}) {
   const { battle = false, showActions = true, battleVisual = null } = options;
   const healthValue = Math.max(0, minion.health);
   const healthClass = healthValue <= 0 ? "zero" : healthValue <= 2 ? "low" : "";
+  const hasDivineShield = Array.isArray(minion.keywords) && minion.keywords.includes("divineShield");
   const battleStateClasses = battleVisual
     ? [
-        battleVisual.isAttacker ? "attacking" : "",
-        battleVisual.isDefender ? "defending" : "",
-        battleVisual.chargeClass,
-        battleVisual.trailClass,
-        battleVisual.takingHit ? "taking-hit" : "",
-        battleVisual.impactClass,
-        battleVisual.vanishClass,
-        battleVisual.reviveClass,
-        battleVisual.defeated ? "defeated" : "",
+      battleVisual.isAttacker ? "attacking" : "",
+      battleVisual.isDefender ? "defending" : "",
+      battleVisual.castClass,
+      battleVisual.chargeClass,
+      battleVisual.idleClass,
+      battleVisual.defeated ? "defeated" : "",
       ]
         .filter(Boolean)
         .join(" ")
     : "";
 
   const card = document.createElement("article");
-  card.className = `minion-card${minion.golden ? " golden" : ""}${battle ? " battle-card" : ""}${battleStateClasses ? ` ${battleStateClasses}` : ""}`;
+  card.className = `minion-card${minion.golden ? " golden" : ""}${battle ? " battle-card" : ""}${hasDivineShield ? " has-divine-shield" : ""}${battleStateClasses ? ` ${battleStateClasses}` : ""}`;
+  if (battle && battleVisual?.instanceId) {
+    card.dataset.instanceId = String(battleVisual.instanceId);
+    card.dataset.side = battleVisual.side || "";
+  }
 
   const keywords = minion.keywords
     .map((keyword) => {
@@ -44,18 +46,8 @@ function buildMinionCard(minion, options = {}) {
     })
     .join("");
 
-  const battleTop = battle
-    ? `
-      <div class="battle-card-top">
-        ${typeof battleVisual?.slotIndex === "number" ? `<span class="battle-slot">站位 ${battleVisual.slotIndex + 1}</span>` : ""}
-        ${battleVisual?.roleLabel ? `<span class="battle-role ${battleVisual.roleClass}">${battleVisual.roleLabel}</span>` : ""}
-      </div>
-    `
-    : "";
-  const battleCue = battleVisual?.cueLabel ? `<div class="battle-float-cue ${battleVisual.cueTone}">${battleVisual.cueLabel}</div>` : "";
-
   const infoToggle = !battle ? '<button type="button" class="card-info-toggle" aria-label="查看描述">i</button>' : "";
-  const descriptionBlock = battle ? `<p class="minion-text">${minion.text || "没有额外效果。"}</p>` : "";
+  const descriptionBlock = "";
   const infoOverlay = !battle
     ? `
       <div class="minion-info-overlay">
@@ -67,9 +59,7 @@ function buildMinionCard(minion, options = {}) {
     : "";
 
   card.innerHTML = `
-    ${battleCue}
     <div class="minion-main">
-      ${battleTop}
       <div class="minion-header">
         <span class="tier-badge">★${minion.tier}</span>
         <div class="minion-title-block">
@@ -97,6 +87,9 @@ function buildMinionCard(minion, options = {}) {
 function buildHandCard(card, options = {}) {
   if (card?.cardKind === "tripleReward") {
     return buildTripleRewardCard(card, options);
+  }
+  if (card?.cardKind === "brandSpell") {
+    return buildBrandSpellCard(card, options);
   }
   return buildMinionCard(card, options);
 }
@@ -128,6 +121,33 @@ function buildTripleRewardCard(card, options = {}) {
   return reward;
 }
 
+function buildBrandSpellCard(card, options = {}) {
+  const { showActions = true } = options;
+  const reward = document.createElement("article");
+  reward.className = "minion-card reward-card brand-card";
+  reward.innerHTML = `
+    <div class="minion-main">
+      <div class="minion-header">
+        <span class="tier-badge reward-badge">品牌</span>
+        <div class="minion-title-block">
+          <h3 class="minion-name">${card.name || "物品牌"}</h3>
+        </div>
+      </div>
+      <p class="reward-text">${card.text || "拖到一个友方随从身上施放。"}</p>
+      <div class="keyword-row">
+        <span class="keyword reward-keyword">法术</span>
+        <span class="keyword reward-keyword">通用</span>
+      </div>
+    </div>
+    <div class="minion-footer">
+      <div class="minion-meta">${card.meta || "物品牌"}</div>
+      <div class="reward-cta">拖到友方随从上施放</div>
+      ${showActions ? '<div class="card-actions"></div>' : ""}
+    </div>
+  `;
+  return reward;
+}
+
 function makeEmptyCard(text) {
   const card = document.createElement("div");
   card.className = "empty-card";
@@ -143,7 +163,7 @@ function getKeywordLabel(keyword) {
     return "挑衅";
   }
   if (keyword === "divineShield") {
-    return "圣盾";
+    return "护盾";
   }
   if (keyword === "deathrattle") {
     return "亡语";

@@ -81,11 +81,12 @@ function performAttackSequence(player, enemy, logs, frames, attackerSide, attack
 
     if (comboIndex > 0) {
       pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(attackerSide)} ${attacker.name} 发动连击，再次发起攻击。`, {
+        actionType: "cue",
         attackerId: attacker.instanceId,
         attackerSide,
         cues: [{ targetId: attacker.instanceId, type: "keyword", label: "连击" }],
         progress,
-        delay: BATTLE_ACTION_DELAY_MS,
+        delay: BATTLE_ATTACK_ACTION_DELAY_MS,
       });
     }
 
@@ -102,7 +103,12 @@ function performSingleAttack(player, enemy, logs, frames, attackerSide, attacker
   const defender = defenders[defenderIndex];
   const extraHits = getAttackExtraHits(defenders, defenderIndex, attacker);
   const defenderSide = attackerSide === "player" ? "enemy" : "player";
-  const attackMessage = `${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。`;
+  const extraSummary = extraHits.length
+    ? extraHits[0].label === "溅射"
+      ? ` ${attacker.name} 的溅射波及了 ${extraHits.map((entry) => entry.target.name).join("、")}，各造成 1 点伤害。`
+      : ` ${attacker.name} 的${extraHits[0].label}波及了 ${extraHits.map((entry) => entry.target.name).join("、")}。`
+    : "";
+  const attackMessage = `${getSideLabel(attackerSide)} ${attacker.name} 攻击了 ${getOpposingSideLabel(attackerSide)} ${defender.name}。${extraSummary}`;
   const battleContext = { player, enemy, logs, frames };
 
   pushBattleLogFrame(player, enemy, logs, frames, attackMessage, {
@@ -110,8 +116,9 @@ function performSingleAttack(player, enemy, logs, frames, attackerSide, attacker
     defenderId: defender.instanceId,
     attackerSide,
     defenderSide,
+    effectSourceId: attacker.instanceId,
     progress,
-    delay: BATTLE_ACTION_DELAY_MS,
+    delay: BATTLE_ATTACK_ACTION_DELAY_MS,
   });
 
   const attackerDamageOptions = {
@@ -130,54 +137,51 @@ function performSingleAttack(player, enemy, logs, frames, attackerSide, attacker
   };
   const attackerDamageNote = applyDamage(attacker, defender.attack, defender, battleContext, attackerDamageOptions);
   const defenderDamageNote = applyDamage(defender, attacker.attack, attacker, battleContext, defenderDamageOptions);
+  const extraHitNotes = extraHits.map((entry) => ({
+    entry,
+    note: applyDamage(entry.target, entry.damage, attacker, battleContext, {
+      attackerId: attacker.instanceId,
+      defenderId: entry.target.instanceId,
+      attackerSide,
+      defenderSide,
+      allowPoisonous: entry.allowPoisonous,
+      progress,
+    }),
+  }));
   pushBattleFrameOnly(player, enemy, frames, {
+    actionType: "attack",
     attackerId: attacker.instanceId,
     defenderId: defender.instanceId,
     attackerSide,
     defenderSide,
     hitIds: [attacker.instanceId, defender.instanceId, ...extraHits.map((entry) => entry.target.instanceId)],
+    hitEffects: [
+      {
+        targetId: defender.instanceId,
+        type: "primary",
+      },
+      ...extraHits.map((entry) => ({
+        targetId: entry.target.instanceId,
+        type: entry.label === "溅射" ? "splash" : entry.label === "横扫" ? "sweep" : "secondary",
+      })),
+    ],
+    effectSourceId: attacker.instanceId,
+    attackKeyword: getAttackKeywordType(attacker),
     progress,
-    delay: BATTLE_HIT_DELAY_MS,
+    delay: BATTLE_ATTACK_HIT_DELAY_MS,
   });
 
   recordPostDamageEffects(attackerDamageNote, attacker, player, enemy, logs, frames, attackerDamageOptions);
   recordPostDamageEffects(defenderDamageNote, defender, player, enemy, logs, frames, defenderDamageOptions);
-
-  if (extraHits.length) {
-    const extraLabel = extraHits[0].label;
-    const extraNames = extraHits.map((entry) => entry.target.name).join("、");
-    const extraLog =
-      extraLabel === "溅射"
-        ? `${attacker.name} 的溅射波及了 ${extraNames}，各造成 1 点伤害。`
-        : `${attacker.name} 的${extraLabel}波及了 ${extraNames}。`;
-    pushBattleLogFrame(player, enemy, logs, frames, extraLog, {
+  extraHitNotes.forEach(({ entry, note }) => {
+    recordPostDamageEffects(note, entry.target, player, enemy, logs, frames, {
       attackerId: attacker.instanceId,
-      defenderId: extraHits[0].target.instanceId,
+      defenderId: entry.target.instanceId,
       attackerSide,
       defenderSide,
-      hitIds: extraHits.map((entry) => entry.target.instanceId),
       progress,
-      delay: BATTLE_HIT_DELAY_MS,
     });
-
-    extraHits.forEach((entry) => {
-      const splashNote = applyDamage(entry.target, entry.damage, attacker, battleContext, {
-        attackerId: attacker.instanceId,
-        defenderId: entry.target.instanceId,
-        attackerSide,
-        defenderSide,
-        allowPoisonous: entry.allowPoisonous,
-        progress,
-      });
-      recordPostDamageEffects(splashNote, entry.target, player, enemy, logs, frames, {
-        attackerId: attacker.instanceId,
-        defenderId: entry.target.instanceId,
-        attackerSide,
-        defenderSide,
-        progress,
-      });
-    });
-  }
+  });
 
   cleanupBattlefield(player, enemy, logs, frames, progress);
   resolvePendingAssaults(player, enemy, logs, frames, attackerSide, progress);
@@ -204,6 +208,7 @@ function applyDamage(target, amount, source = null, battleContext = null, option
         battleContext.frames,
         `${getSideLabel(defenderSide)} ${protector.name} 以壁垒为 ${target.name} 分担了 ${redirected} 点伤害。`,
         {
+          actionType: "cue",
           attackerId: options.attackerId ?? (source ? source.instanceId : null),
           defenderId: protector.instanceId,
           attackerSide: options.attackerSide ?? "",
@@ -302,6 +307,7 @@ function removeDefeatedMinions(board, opposingBoard, player, enemy, side, logs, 
     const sideLabel = getSideLabel(side);
     const deathMessage = `${sideLabel} ${minion.name} 阵亡。`;
     pushBattleLogFrame(player, enemy, logs, frames, deathMessage, {
+      actionType: "cleanup",
       defeatedIds: [minion.instanceId],
       progress,
       delay: BATTLE_CLEANUP_DELAY_MS,
@@ -327,8 +333,11 @@ function tryResolveReborn(board, index, minion, player, enemy, side, logs, frame
   board.splice(index, 1, minion);
   markPendingAssault(minion);
   pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(side)} ${minion.name} 触发复生，再次回到了战场。`, {
+    actionType: "cue",
     defeatedIds: [],
     hitIds: [minion.instanceId],
+    hitEffects: [{ targetId: minion.instanceId, type: "reborn" }],
+    effectSourceId: minion.instanceId,
     cues: [{ targetId: minion.instanceId, type: "keyword", label: "复生" }],
     progress,
     delay: BATTLE_CLEANUP_DELAY_MS,
@@ -355,12 +364,33 @@ function recordShieldBreak(note, target, player, enemy, logs, frames, options = 
     return;
   }
 
-  pushBattleLogFrame(player, enemy, logs, frames, `${target.name} 的圣盾被打掉了。`, {
-    ...options,
-    hitIds: [target.instanceId],
-    cues: [{ targetId: target.instanceId, type: "keyword", label: "圣盾破裂" }],
+  pushBattleLogFrame(player, enemy, logs, frames, `${target.name} 的护盾被打掉了。`, {
+    actionType: "cue",
+    attackerId: null,
+    defenderId: null,
+    attackerSide: "",
+    defenderSide: "",
+    hitIds: [],
+    defeatedIds: [],
+    hitEffects: [{ targetId: target.instanceId, type: "shield-break" }],
+    effectSourceId: target.instanceId,
+    cues: [{ targetId: target.instanceId, type: "keyword", label: "护盾破裂" }],
+    progress: options.progress,
     delay: BATTLE_HIT_DELAY_MS,
   });
+}
+
+function getAttackKeywordType(attacker) {
+  if (attacker.keywords.includes("sweep")) {
+    return "sweep";
+  }
+  if (attacker.keywords.includes("splash")) {
+    return "splash";
+  }
+  if (attacker.keywords.includes("cleave")) {
+    return "cleave";
+  }
+  return "";
 }
 
 function getSideLabel(side) {
@@ -407,7 +437,6 @@ function resolvePendingAssaults(player, enemy, logs, frames, preferredSide, prog
     if (!next) {
       return;
     }
-
     next.minion.pendingAssault = false;
     const opposingBoard = next.side === "player" ? enemy : player;
     if (next.minion.health <= 0 || next.minion.attack <= 0 || !opposingBoard.length) {
@@ -415,6 +444,7 @@ function resolvePendingAssaults(player, enemy, logs, frames, preferredSide, prog
     }
 
     pushBattleLogFrame(player, enemy, logs, frames, `${getSideLabel(next.side)} ${next.minion.name} 触发狂袭，立即发起攻击。`, {
+      actionType: "cue",
       attackerId: next.minion.instanceId,
       attackerSide: next.side,
       cues: [{ targetId: next.minion.instanceId, type: "keyword", label: "狂袭" }],

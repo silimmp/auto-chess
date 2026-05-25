@@ -23,6 +23,7 @@ function renderGame({
   if (elements.shopOdds) {
     elements.shopOdds.textContent = formatTierOdds(SHOP_TIER_ODDS[state.tavernTier]);
   }
+  syncActiveTribes(state, elements);
   syncTimerDisplay(state, elements);
   if (elements.message) {
     elements.message.textContent = state.message;
@@ -46,6 +47,15 @@ function renderGame({
 }
 
 const prepCardNodeCache = new Map();
+const battleCardNodeCache = new Map();
+
+function getBattleDebugRuntime() {
+  return window.__AUTO_CHESS_BATTLE_DEBUG__ || null;
+}
+
+function recordBattleDebug(type, payload) {
+  getBattleDebugRuntime()?.record?.(type, payload);
+}
 
 function getPrepCardKey(card, zone, index) {
   if (zone === "shop") {
@@ -89,6 +99,162 @@ function buildPrepCardNode(card, zone) {
     return buildHandCard(card, { showActions: false });
   }
   return buildMinionCard(card, { showActions: false });
+}
+
+function getBattleCardKey(minion, side, index) {
+  if (minion.instanceId !== null && minion.instanceId !== undefined) {
+    return `battle:${side}:${minion.instanceId}`;
+  }
+  return `battle:${side}:${minion.id || minion.name || "card"}:${index}`;
+}
+
+function getBattleCardSignature(minion) {
+  return [
+    minion.id || "",
+    minion.name || "",
+    minion.attack ?? "",
+    minion.health ?? "",
+    minion.golden ? 1 : 0,
+    minion.tier ?? "",
+    minion.tribe || "",
+    Array.isArray(minion.keywords) ? minion.keywords.join(",") : "",
+    minion.text || "",
+  ].join("|");
+}
+
+function syncNodeText(target, source) {
+  if (!target || !source) {
+    return false;
+  }
+  if (target.textContent !== source.textContent) {
+    target.textContent = source.textContent;
+  }
+  return true;
+}
+
+function syncNodeClass(target, source) {
+  if (!target || !source) {
+    return false;
+  }
+  if (target.className !== source.className) {
+    target.className = source.className;
+  }
+  return true;
+}
+
+function syncNodeMarkup(target, source) {
+  if (!target || !source) {
+    return false;
+  }
+  if (target.innerHTML !== source.innerHTML) {
+    target.innerHTML = source.innerHTML;
+  }
+  return true;
+}
+
+function patchBattleCardContent(node, fresh) {
+  const targetTier = node.querySelector(".tier-badge");
+  const freshTier = fresh.querySelector(".tier-badge");
+  const targetName = node.querySelector(".minion-name");
+  const freshName = fresh.querySelector(".minion-name");
+  const targetKeywords = node.querySelector(".keyword-row");
+  const freshKeywords = fresh.querySelector(".keyword-row");
+  const targetMeta = node.querySelector(".minion-meta");
+  const freshMeta = fresh.querySelector(".minion-meta");
+  const targetAttack = node.querySelector(".stat-pill.attack");
+  const freshAttack = fresh.querySelector(".stat-pill.attack");
+  const targetHealth = node.querySelector(".stat-pill.health");
+  const freshHealth = fresh.querySelector(".stat-pill.health");
+
+  const complete =
+    syncNodeText(targetTier, freshTier) &&
+    syncNodeText(targetName, freshName) &&
+    syncNodeMarkup(targetKeywords, freshKeywords) &&
+    syncNodeText(targetMeta, freshMeta) &&
+    syncNodeText(targetAttack, freshAttack) &&
+    syncNodeText(targetHealth, freshHealth) &&
+    syncNodeClass(targetHealth, freshHealth);
+
+  if (!complete) {
+    node.innerHTML = fresh.innerHTML;
+    return false;
+  }
+  return true;
+}
+
+function syncBattleCardNode(node, minion, battleVisual) {
+  const fresh = buildMinionCard(minion, {
+    battle: true,
+    showActions: false,
+    battleVisual,
+  });
+  const nextSignature = getBattleCardSignature(minion);
+  const previousClassName = node.className;
+  const previousSignature = node.dataset.renderSignature || "";
+  let patchedContent = false;
+
+  if (node.dataset.renderSignature !== nextSignature) {
+    patchedContent = patchBattleCardContent(node, fresh);
+    node.dataset.renderSignature = nextSignature;
+  }
+
+  if (node.className !== fresh.className) {
+    node.className = fresh.className;
+  }
+
+  ["data-instance-id", "data-side"].forEach((attr) => {
+    const value = fresh.getAttribute(attr);
+    if (value === null) {
+      node.removeAttribute(attr);
+    } else if (node.getAttribute(attr) !== value) {
+      node.setAttribute(attr, value);
+    }
+  });
+
+  recordBattleDebug("battle-card-sync", {
+    instanceId: battleVisual?.instanceId ?? minion.instanceId ?? null,
+    side: battleVisual?.side || "",
+    reused: true,
+    signatureChanged: previousSignature !== nextSignature,
+    classChanged: previousClassName !== node.className,
+    patchedContent,
+    prevClassName: previousClassName,
+    nextClassName: node.className,
+    attack: minion.attack,
+    health: minion.health,
+  });
+}
+
+function buildBattleLaneNodes(minions, side, state) {
+  return minions.map((minion, index) => {
+    const key = getBattleCardKey(minion, side, index);
+    const battleVisual = getBattleVisualState(state, minion, side, index);
+    let node = battleCardNodeCache.get(key);
+
+    if (!node) {
+      node = buildMinionCard(minion, {
+        battle: true,
+        showActions: false,
+        battleVisual,
+      });
+      node.dataset.renderSignature = getBattleCardSignature(minion);
+      battleCardNodeCache.set(key, node);
+      recordBattleDebug("battle-card-sync", {
+        instanceId: battleVisual?.instanceId ?? minion.instanceId ?? null,
+        side,
+        reused: false,
+        created: true,
+        className: node.className,
+        attack: minion.attack,
+        health: minion.health,
+        slotIndex: index,
+      });
+      return node;
+    }
+
+    syncBattleCardNode(node, minion, battleVisual);
+    return node;
+  });
 }
 
 function reconcilePrepZone(container, desiredNodes) {
@@ -191,6 +357,29 @@ function syncLobbyPanel(state, elements) {
   }
 }
 
+function syncActiveTribes(state, elements) {
+  if (!elements.activeTribesList) {
+    return;
+  }
+
+  const ordered = [...(state.activeTribes || [])]
+    .filter((tribe) => tribe !== ALWAYS_AVAILABLE_TRIBE)
+    .sort((left, right) => left.localeCompare(right, "zh-Hans-CN"));
+  const signature = ordered.join("|");
+  if (elements.activeTribesList.dataset.signature === signature) {
+    return;
+  }
+
+  elements.activeTribesList.dataset.signature = signature;
+  elements.activeTribesList.innerHTML = "";
+  ordered.forEach((tribe) => {
+    const chip = document.createElement("span");
+    chip.className = "active-tribe-chip";
+    chip.textContent = tribe;
+    elements.activeTribesList.appendChild(chip);
+  });
+}
+
 function syncTimerDisplay(state, elements) {
   const isPrep = state.phase === "prep";
   elements.timer.textContent = isPrep ? `${state.timeLeft}s` : state.phase === "gameOver" ? "结束" : "战斗中";
@@ -270,12 +459,14 @@ function renderBattleBoards(state, elements) {
 
   renderBattleLane(elements.battleEnemy, enemySnapshot, "战斗开始后，对手阵容会显示在这里。", state, elements);
   renderBattleLane(elements.battlePlayer, playerSnapshot, "你的战队会在战斗阶段显示在这里。", state, elements);
+  syncBattleAttackIndicator(state, elements);
 }
 
 function syncBattleOverlay(state, elements) {
   if (elements.battleView) {
     elements.battleView.dataset.focusSide = getBattleFocusSide(state);
     elements.battleView.dataset.battleState = getBattleOverlayState(state);
+    elements.battleView.dataset.actionType = state.phase === "battle" && state.battleAnimation.active ? state.battleAnimation.actionType || "" : "";
   }
 
   if (elements.battleTurnPill) {
@@ -350,17 +541,18 @@ function renderDiscover(state, elements) {
   elements.discoverChoices.innerHTML = "";
 
   if (elements.discoverTitle) {
-    elements.discoverTitle.textContent = "选择一张奖励随从";
+    elements.discoverTitle.textContent = discover.title || "选择一张奖励随从";
   }
   if (elements.discoverSubtitle) {
-    elements.discoverSubtitle.textContent = `从四张 ${discover.rewardTier} 星随从中挑选一张加入手牌。`;
+    elements.discoverSubtitle.textContent =
+      discover.subtitle || `从四张 ${discover.rewardTier} 星随从中挑选一张加入手牌。`;
   }
 
-  discover.choices.forEach((minion, index) => {
+  discover.choices.forEach((card, index) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "discover-choice";
-    button.appendChild(buildMinionCard(minion, { showActions: false }));
+    button.appendChild(card?.cardKind === "brandSpell" ? buildHandCard(card, { showActions: false }) : buildMinionCard(card, { showActions: false }));
     button.addEventListener("click", () => {
       window.__AUTO_CHESS_APP__?.chooseDiscoverReward?.(index);
     });
@@ -373,21 +565,18 @@ function renderBattleLane(container, minions, emptyText, state, elements) {
     return;
   }
 
-  container.innerHTML = "";
   if (!minions.length) {
-    container.appendChild(makeEmptyCard(emptyText));
+    reconcilePrepZone(container, [makeEmptyCard(emptyText)]);
     return;
   }
 
-  minions.forEach((minion, index) => {
-    const side = container === elements.battlePlayer ? "player" : "enemy";
-    const card = buildMinionCard(minion, {
-      battle: true,
-      showActions: false,
-      battleVisual: getBattleVisualState(state, minion, side, index),
-    });
-    container.appendChild(card);
+  const side = container === elements.battlePlayer ? "player" : "enemy";
+  recordBattleDebug("battle-lane-render", {
+    side,
+    size: minions.length,
+    ids: minions.map((minion) => minion.instanceId ?? minion.id ?? null),
   });
+  reconcilePrepZone(container, buildBattleLaneNodes(minions, side, state));
 }
 
 function getBattleVisualState(state, minion, side, slotIndex) {
@@ -397,36 +586,169 @@ function getBattleVisualState(state, minion, side, slotIndex) {
       slotIndex,
       isAttacker: false,
       isDefender: false,
-      takingHit: false,
       defeated: minion.health <= 0,
       chargeClass: "",
-      trailClass: "",
-      impactClass: "",
-      roleLabel: "",
-      roleClass: "",
+      idleClass: "",
+      damagePop: 0,
+      instanceId: minion.instanceId,
+      side,
     };
   }
 
-  const isAttacker = animation.attackerId === minion.instanceId && animation.attackerSide === side;
-  const isDefender = animation.defenderId === minion.instanceId && animation.defenderSide === side;
+  const previousBoard = Array.isArray(side === "player" ? animation.previousPlayerBoard : animation.previousEnemyBoard)
+    ? side === "player"
+      ? animation.previousPlayerBoard
+      : animation.previousEnemyBoard
+    : [];
+  const previousMinion = previousBoard.find((entry) => entry.instanceId === minion.instanceId) || null;
+  const activeAttacker = animation.attackerId === minion.instanceId && animation.attackerSide === side;
+  const activeDefender = animation.defenderId === minion.instanceId && animation.defenderSide === side;
+  const focusedAttacker =
+    animation.focusAttackerId === minion.instanceId && animation.focusAttackerSide === side;
+  const focusedDefender =
+    animation.focusDefenderId === minion.instanceId && animation.focusDefenderSide === side;
+  const isAttacker = activeAttacker || focusedAttacker;
+  const isDefender = activeDefender || focusedDefender;
   const cue = animation.cues.find((entry) => entry.targetId === minion.instanceId) || null;
   const wasDefeated = animation.defeatedIds.includes(minion.instanceId);
+  const isCombatStartAction = animation.actionType === "combatStart";
+  const isCueAction = animation.actionType === "cue";
+  const isCaster = isCombatStartAction && activeAttacker;
+  const isCueTarget = Boolean(cue);
+  const actionFocused =
+    Boolean(animation.focusAttackerId) ||
+    Boolean(animation.focusDefenderId) ||
+    Boolean(animation.hitIds?.length) ||
+    isCombatStartAction ||
+    isCueTarget;
+  const isInvolved = isAttacker || isDefender || animation.hitIds.includes(minion.instanceId) || isCueTarget;
 
   return {
     slotIndex,
     isAttacker,
     isDefender,
-    takingHit: animation.hitIds.includes(minion.instanceId),
     defeated: wasDefeated,
-    chargeClass: isAttacker ? (side === "player" ? "charge-player" : "charge-enemy") : "",
-    trailClass: isAttacker ? (side === "player" ? "trail-player" : "trail-enemy") : "",
-    impactClass: animation.hitIds.includes(minion.instanceId) ? (side === "player" ? "impact-player" : "impact-enemy") : "",
-    vanishClass: wasDefeated ? "vanishing" : "",
-    reviveClass: cue?.label === "复生" ? "reviving" : "",
-    cueLabel: cue?.label || "",
-    cueTone: getBattleCueTone(cue?.label),
-    roleLabel: isAttacker ? "进攻" : isDefender ? "受击" : "",
-    roleClass: isAttacker ? "attacker" : isDefender ? "defender" : "",
+    chargeClass:
+      activeAttacker && !isCombatStartAction && !isCueAction ? (animation.hitIds.length ? "charge-return" : "charge-advance") : "",
+    idleClass: actionFocused && !isInvolved ? "battle-idle" : "",
+    damagePop: previousMinion && previousMinion.health > minion.health ? Math.max(1, previousMinion.health - minion.health) : 0,
+    castClass: isCaster ? "casting" : "",
+    instanceId: minion.instanceId,
+    side,
+  };
+}
+
+function syncBattleAttackIndicator(state, elements) {
+  const battleView = elements.battleView;
+  if (!battleView) {
+    return;
+  }
+
+  resetBattleMotionStyles(battleView);
+
+  const animation = state.battleAnimation;
+  const shouldShow =
+    state.phase === "battle" &&
+    animation.active &&
+    animation.actionType !== "combatStart" &&
+    Boolean(animation.attackerId) &&
+    Boolean(animation.defenderId);
+
+  if (!shouldShow) {
+    return;
+  }
+
+  const attackerCard = battleView.querySelector(`.battle-board .minion-card[data-instance-id="${animation.attackerId}"][data-side="${animation.attackerSide}"]`);
+  const defenderCard = battleView.querySelector(`.battle-board .minion-card[data-instance-id="${animation.defenderId}"][data-side="${animation.defenderSide}"]`);
+  const arena = battleView.querySelector(".battle-arena");
+  if (!attackerCard || !defenderCard || !arena) {
+    return;
+  }
+
+  const arenaRect = arena.getBoundingClientRect();
+  const attackerRect = attackerCard.getBoundingClientRect();
+  const defenderRect = defenderCard.getBoundingClientRect();
+  const attackerCenterX = attackerRect.left + attackerRect.width / 2 - arenaRect.left;
+  const attackerCenterY = attackerRect.top + attackerRect.height / 2 - arenaRect.top;
+  const defenderCenterX = defenderRect.left + defenderRect.width / 2 - arenaRect.left;
+  const defenderCenterY = defenderRect.top + defenderRect.height / 2 - arenaRect.top;
+
+  const motion = getBattleDashMotion(
+    {
+      x: attackerCenterX,
+      y: attackerCenterY,
+      width: attackerRect.width,
+      height: attackerRect.height,
+    },
+    {
+      x: defenderCenterX,
+      y: defenderCenterY,
+      width: defenderRect.width,
+      height: defenderRect.height,
+    }
+  );
+  attackerCard.style.setProperty("--attack-dash-x", `${motion.dashX}px`);
+  attackerCard.style.setProperty("--attack-dash-y", `${motion.dashY}px`);
+  defenderCard.style.setProperty("--impact-shift-x", `${motion.impactX}px`);
+  defenderCard.style.setProperty("--impact-shift-y", `${motion.impactY}px`);
+
+  recordBattleDebug("battle-motion-sync", {
+    attackerId: animation.attackerId,
+    attackerSide: animation.attackerSide,
+    defenderId: animation.defenderId,
+    defenderSide: animation.defenderSide,
+    actionType: animation.actionType || "",
+    attackerClassName: attackerCard.className,
+    defenderClassName: defenderCard.className,
+    dashX: Number(motion.dashX.toFixed(2)),
+    dashY: Number(motion.dashY.toFixed(2)),
+    impactX: Number(motion.impactX.toFixed(2)),
+    impactY: Number(motion.impactY.toFixed(2)),
+    attackerRect: {
+      x: Number(attackerRect.left.toFixed(2)),
+      y: Number(attackerRect.top.toFixed(2)),
+      width: Number(attackerRect.width.toFixed(2)),
+      height: Number(attackerRect.height.toFixed(2)),
+    },
+    defenderRect: {
+      x: Number(defenderRect.left.toFixed(2)),
+      y: Number(defenderRect.top.toFixed(2)),
+      width: Number(defenderRect.width.toFixed(2)),
+      height: Number(defenderRect.height.toFixed(2)),
+    },
+  });
+}
+
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function resetBattleMotionStyles(battleView) {
+  battleView.querySelectorAll(".battle-board .minion-card").forEach((card) => {
+    card.style.removeProperty("--attack-dash-x");
+    card.style.removeProperty("--attack-dash-y");
+    card.style.removeProperty("--impact-shift-x");
+    card.style.removeProperty("--impact-shift-y");
+  });
+}
+
+function getBattleDashMotion(attacker, defender) {
+  const deltaX = defender.x - attacker.x;
+  const deltaY = defender.y - attacker.y;
+  const distance = Math.max(1, Math.hypot(deltaX, deltaY));
+  const overlapDepth = Math.min(attacker.height, defender.height) * 0.42;
+  const collisionCenterDistance = (attacker.height + defender.height) / 2 - overlapDepth;
+  const travelDistance = clampNumber(distance - collisionCenterDistance, 32, distance * 0.84);
+  const unitX = deltaX / distance;
+  const unitY = deltaY / distance;
+  const dashX = unitX * travelDistance;
+  const dashY = unitY * travelDistance;
+  const impactDistance = Math.min(10, Math.max(4, travelDistance * 0.05));
+  return {
+    dashX,
+    dashY,
+    impactX: unitX * impactDistance,
+    impactY: unitY * impactDistance,
   };
 }
 
@@ -450,17 +772,4 @@ function getBattleOverlayState(state) {
     return "idle";
   }
   return state.battleAnimation.isAnimating ? "animating" : "resolved";
-}
-
-function getBattleCueTone(label) {
-  if (label === "亡语" || label === "复生") {
-    return "necromancy";
-  }
-  if (label === "圣盾破裂") {
-    return "shield";
-  }
-  if (label === "狂袭" || label === "连击") {
-    return "attack";
-  }
-  return "neutral";
 }

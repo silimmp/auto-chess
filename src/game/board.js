@@ -14,6 +14,9 @@ function playCardFromHandState(state, index, target = {}) {
   if (cardKind === "tripleReward") {
     return playTripleRewardCardFromHandState(state, index);
   }
+  if (cardKind === "brandSpell") {
+    return playBrandSpellCardFromHandState(state, index, target.targetIndex);
+  }
   state.message = `这张牌暂时还不能直接打出。`;
   return true;
 }
@@ -51,9 +54,33 @@ function playTripleRewardCardFromHandState(state, index) {
   state.discover = {
     source: "tripleReward",
     rewardTier: card.rewardTier,
-    choices: createTripleRewardChoices(card.rewardTier),
+    choices: createTripleRewardChoices(card.rewardTier, null, 4, state.activeTribes),
   };
   state.message = `打出了 ${card.name}，请选择一张 ${card.rewardTier} 星奖励随从。`;
+  return true;
+}
+
+function playBrandSpellCardFromHandState(state, index, targetIndex = null) {
+  const card = state.hand[index];
+  if (!card || state.hp <= 0) {
+    return false;
+  }
+  if (!state.board.length) {
+    state.message = "场上还没有友方随从，暂时没有施法目标。";
+    return true;
+  }
+
+  const normalizedIndex = normalizeSpellTargetIndex(targetIndex, state.board.length);
+  const target = state.board[normalizedIndex];
+  if (!target) {
+    state.message = "请选择一个友方随从来承接这个物品牌。";
+    return true;
+  }
+
+  applyBrandSpellEffect(target, card.effect);
+  state.hand.splice(index, 1);
+  resolveBrandCastTriggers(state, target, card);
+  state.message = buildBrandSpellMessage(card, target);
   return true;
 }
 
@@ -62,7 +89,8 @@ function chooseDiscoverRewardState(state, choiceIndex) {
     return false;
   }
 
-  const chosen = copyMinion(state.discover.choices[choiceIndex]);
+  const chosen = copyDiscoverChoice(state.discover.choices[choiceIndex]);
+  const discoverSource = state.discover.source;
   state.discover = null;
 
   if (state.hand.length >= HAND_LIMIT) {
@@ -71,12 +99,99 @@ function chooseDiscoverRewardState(state, choiceIndex) {
   }
 
   state.hand.unshift(chosen);
-  state.message = `你选择了 ${chosen.name}，奖励随从已加入手牌。`;
+  state.message =
+    discoverSource === "brandDiscover"
+      ? `你选择了 ${chosen.name}，物品牌已加入手牌。`
+      : `你选择了 ${chosen.name}，奖励随从已加入手牌。`;
   return true;
 }
 
 function getHandCardKind(card) {
   return card?.cardKind || "minion";
+}
+
+function normalizeSpellTargetIndex(index, boardLength) {
+  if (!Number.isFinite(index)) {
+    return boardLength > 0 ? boardLength - 1 : -1;
+  }
+  return Math.max(0, Math.min(boardLength - 1, index));
+}
+
+function applyBrandSpellEffect(target, effect) {
+  if (!target || !effect) {
+    return;
+  }
+
+  target.attack += effect.attack ?? 0;
+  target.health += effect.health ?? 0;
+  (effect.addKeywords || []).forEach((keyword) => {
+    if (!target.keywords.includes(keyword)) {
+      target.keywords.push(keyword);
+    }
+  });
+}
+
+function buildBrandSpellMessage(card, target) {
+  const attack = card.effect?.attack ?? 0;
+  const health = card.effect?.health ?? 0;
+  const statLabel =
+    attack || health
+      ? `使其获得 ${attack >= 0 ? `+${attack}` : attack}/${health >= 0 ? `+${health}` : health}`
+      : "为其附加了额外效果";
+  const keywords = (card.effect?.addKeywords || []).map(getKeywordLabel);
+  const keywordLabel = keywords.length ? `，并赋予${keywords.join("、")}` : "";
+  return `对 ${target.name} 使用了 ${card.name}，${statLabel}${keywordLabel}。`;
+}
+
+function resolveBrandCastTriggers(state, target, card) {
+  if (!state?.board?.length) {
+    return;
+  }
+
+  state.board
+    .filter((minion) => minion.health > 0 && minion.brandCastTrigger)
+    .forEach((minion) => {
+      const ability = minion.brandCastTrigger;
+      if (ability.type === "buff-self-when-brand-cast" || ability.type === "reduce-random-brand-cost-placeholder") {
+        minion.attack += ability.attack ?? 0;
+        minion.health += ability.health ?? 0;
+        return;
+      }
+
+      if (ability.type === "buff-friendly-tribe-when-brand-cast") {
+        state.board.forEach((friendly) => {
+          if (friendly.health <= 0) {
+            return;
+          }
+          if (!ability.includeSource && friendly.instanceId === minion.instanceId) {
+            return;
+          }
+          if (ability.tribe && friendly.tribe !== ability.tribe) {
+            return;
+          }
+          friendly.attack += ability.attack ?? 0;
+          friendly.health += ability.health ?? 0;
+        });
+        return;
+      }
+
+      if (ability.type === "buff-random-friendly-when-brand-cast") {
+        const candidates = state.board.filter((friendly) => friendly.health > 0);
+        const count = Math.min(ability.count ?? 1, candidates.length);
+        for (let index = 0; index < count; index += 1) {
+          const chosen = candidates[index];
+          chosen.attack += ability.attack ?? 0;
+          chosen.health += ability.health ?? 0;
+        }
+      }
+    });
+}
+
+function copyDiscoverChoice(choice) {
+  if (choice?.cardKind === "brandSpell") {
+    return createBrandCard(choice.id);
+  }
+  return copyMinion(choice);
 }
 
 function moveHandMinionState(state, index, targetIndex) {

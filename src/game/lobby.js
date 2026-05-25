@@ -18,12 +18,12 @@ function createLobbyPlayer(id, name, isHuman = false) {
   };
 }
 
-function createInitialLobby(generateEnemyBoard, pickRandom, randomInt) {
+function createInitialLobby(generateEnemyBoard, pickRandom, randomInt, activeTribes = null) {
   const players = [createLobbyPlayer("player", "你", true)];
   const aiNames = createLobbyAiNames(pickRandom, randomInt, LOBBY_PLAYER_COUNT - 1);
   for (let index = 1; index < LOBBY_PLAYER_COUNT; index += 1) {
     const ai = createLobbyPlayer(`ai-${index}`, aiNames[index - 1]);
-    ai.board = generateEnemyBoard(1, pickRandom, randomInt);
+    ai.board = generateEnemyBoard(1, pickRandom, randomInt, activeTribes);
     players.push(ai);
   }
 

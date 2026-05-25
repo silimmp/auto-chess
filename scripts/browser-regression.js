@@ -321,7 +321,10 @@ async function collectHudAndToolbarMetrics(page) {
     const lobbyListBlock = document.querySelector(".lobby-list-block");
     const shopTitle = document.querySelector(".shop-title");
     const odds = document.querySelector(".shop-odds-inline");
-    if (!lobbyPanel || !lobbyRoster || !lobbyListBlock || !shopTitle || !odds) {
+    const timerCard = document.querySelector("#timer-card");
+    const activeTribesCard = document.querySelector("#active-tribes-card");
+    const sharedBody = document.querySelector(".prep-shared-body");
+    if (!lobbyPanel || !lobbyRoster || !lobbyListBlock || !shopTitle || !odds || !timerCard || !activeTribesCard || !sharedBody) {
       return null;
     }
 
@@ -330,6 +333,9 @@ async function collectHudAndToolbarMetrics(page) {
     const lobbyListRect = lobbyListBlock.getBoundingClientRect();
     const shopTitleRect = shopTitle.getBoundingClientRect();
     const oddsRect = odds.getBoundingClientRect();
+    const timerRect = timerCard.getBoundingClientRect();
+    const activeTribesRect = activeTribesCard.getBoundingClientRect();
+    const sharedBodyRect = sharedBody.getBoundingClientRect();
     return {
       lobbyListVisibleHeight: Math.round(lobbyListRect.height),
       lobbyRosterBottomOverflow: Math.round(lobbyRosterRect.bottom - lobbyPanelRect.bottom),
@@ -339,6 +345,9 @@ async function collectHudAndToolbarMetrics(page) {
       oddsOffsetFromTitleTop: Math.round(oddsRect.top - shopTitleRect.top),
       oddsRightOfTitleBox: Math.round(oddsRect.left - shopTitleRect.left),
       oddsRowDelta: Math.round((oddsRect.top + oddsRect.bottom) / 2 - (shopTitleRect.top + shopTitleRect.bottom) / 2),
+      tribesCardRightOfTimer: Math.round(activeTribesRect.left - timerRect.right),
+      tribesCardBottomGapToShared: Math.round(sharedBodyRect.top - activeTribesRect.bottom),
+      tribesChipCount: activeTribesCard.querySelectorAll(".active-tribe-chip").length,
     };
   });
 }
@@ -561,6 +570,9 @@ async function main() {
         assert(detail.lobbyRosterBottomOverflow <= 0, "桌面缩放时大厅名单不应溢出到底板外。");
         assert(detail.oddsRightOfTitleBox >= 70, "桌面缩放时概率条应位于随从商店标题右侧。");
         assert(Math.abs(detail.oddsRowDelta) <= 40, "桌面缩放时概率条应与随从商店标题保持同一行。");
+        assert(detail.tribesCardRightOfTimer >= 0, "本局种族展示应位于倒计时右侧。");
+        assert(detail.tribesCardBottomGapToShared >= 0, "本局种族展示不应侵入下面的共享招募区域。");
+        assert(detail.tribesChipCount >= 1, "本局种族展示区域应渲染种族标签。");
         return { detail, initial };
       })
     );
@@ -610,6 +622,8 @@ async function main() {
         assert(handMetrics.cardVisibleHeight >= 56, `低高度桌面视口下手牌默认露出高度不足：${JSON.stringify({ detail, handMetrics, viewportMetrics })}`);
         assert(handMetrics.trayVisibleHeight >= 104, `低高度桌面视口下手牌区可见高度不足：${JSON.stringify({ detail, handMetrics, viewportMetrics })}`);
         assert(detail.lobbyListVisibleHeight >= 112, `低高度桌面视口下大厅名单可见高度不足：${JSON.stringify({ detail, handMetrics, viewportMetrics })}`);
+        assert(detail.tribesCardRightOfTimer >= 0, `低高度桌面视口下本局种族展示应位于倒计时右侧：${JSON.stringify({ detail, handMetrics, viewportMetrics })}`);
+        assert(detail.tribesCardBottomGapToShared >= 0, `低高度桌面视口下本局种族展示不应侵入共享区：${JSON.stringify({ detail, handMetrics, viewportMetrics })}`);
         assert(viewportMetrics.axisY < 1 || viewportMetrics.scale < 1, "低高度桌面视口下应触发纵向收缩或整体缩放。");
         return { detail, handMetrics, viewportMetrics };
       })
@@ -980,6 +994,105 @@ async function main() {
     );
 
     results.push(
+      await runScenario("brand-spell-drag-cast", browser, url, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.gold = 3;
+          api.state.board = [api.createOwnedMinion("taunt-guard")];
+          api.state.hand = [createBrandCard("gyro-core")];
+          api.state.shop = [];
+          api.state.enemyBoard = [];
+          api.render();
+        });
+
+        await dragCenter(page, "#hand-board .minion-card:nth-child(1)", "#player-board .minion-card:nth-child(1)");
+        const castState = await page.evaluate(() => ({
+          handCount: window.__AUTO_CHESS_TEST_API__.state.hand.length,
+          board: window.__AUTO_CHESS_TEST_API__.state.board.map((minion) => ({
+            name: minion.name,
+            attack: minion.attack,
+            health: minion.health,
+            keywords: [...minion.keywords],
+          })),
+          message: document.querySelector("#message-value")?.textContent?.trim(),
+        }));
+
+        assert(castState.handCount === 0, "拖拽物品牌施放后应从手牌移除。");
+        assert(castState.board[0].attack === 3 && castState.board[0].health === 3, "拖拽物品牌后目标属性应提升。");
+        assert(castState.board[0].keywords.includes("divineShield"), "拖拽物品牌后目标应获得护盾。");
+        return castState;
+      })
+    );
+
+    results.push(
+      await runScenario("brand-discover-playout", browser, url, async (page) => {
+        await page.evaluate(() => {
+          const api = window.__AUTO_CHESS_TEST_API__;
+          api.stopPrepTimer();
+          api.state.phase = "prep";
+          api.state.hp = 30;
+          api.state.gold = 3;
+          api.state.hand = [];
+          api.state.shop = [];
+          api.state.enemyBoard = [];
+          api.state.board = [api.createOwnedMinion("vault-curator")];
+          resolveLobbyPhaseEffects(api.state, "turnEnd", null, pickRandom, randomInt);
+          api.render();
+        });
+
+        const discoverState = await page.evaluate(() => ({
+          discoverOpen: !document.querySelector("#discover-view")?.classList.contains("hidden"),
+          choices: document.querySelectorAll("#discover-choices .minion-card").length,
+          subtitle: document.querySelector("#discover-subtitle")?.textContent?.trim(),
+        }));
+
+        assert(discoverState.discoverOpen, "高级矮人打造后应打开物品牌发现层。");
+        assert(discoverState.choices === 5, "物品牌发现应展示 5 个可选品牌。");
+
+        await page.click("#discover-choices .discover-choice:nth-child(1)");
+
+        const afterPick = await page.evaluate(() => ({
+          discoverOpen: !document.querySelector("#discover-view")?.classList.contains("hidden"),
+          hand: window.__AUTO_CHESS_TEST_API__.state.hand.map((card) => ({
+            cardKind: card.cardKind,
+            id: card.id,
+          })),
+          message: document.querySelector("#message-value")?.textContent?.trim(),
+        }));
+
+        assert(afterPick.discoverOpen === false, "选择物品牌后发现层应关闭。");
+        assert(afterPick.hand.length === 1 && afterPick.hand[0].cardKind === "brandSpell", "选择后应将物品牌加入手牌。");
+        return { discoverState, afterPick };
+      })
+    );
+
+    results.push(
+      await runScenario("active-tribe-pool-reset", browser, url, async (page) => {
+        const beforeReset = await page.evaluate(() => ({
+          activeTribes: [...window.__AUTO_CHESS_TEST_API__.state.activeTribes],
+          shopTribes: window.__AUTO_CHESS_TEST_API__.state.shop.map((minion) => minion.tribe),
+        }));
+
+        await page.click("#reset-btn");
+        await page.waitForTimeout(180);
+
+        const afterReset = await page.evaluate(() => ({
+          activeTribes: [...window.__AUTO_CHESS_TEST_API__.state.activeTribes],
+          shopTribes: window.__AUTO_CHESS_TEST_API__.state.shop.map((minion) => minion.tribe),
+        }));
+
+        assert(beforeReset.activeTribes.includes("中立") && afterReset.activeTribes.includes("中立"), "中立应始终在可用种族中。");
+        assert(beforeReset.activeTribes.filter((tribe) => tribe !== "中立").length === 5, "重开前应有 5 个非中立可用种族。");
+        assert(afterReset.activeTribes.filter((tribe) => tribe !== "中立").length === 5, "重开后应仍有 5 个非中立可用种族。");
+        assert(afterReset.shopTribes.every((tribe) => afterReset.activeTribes.includes(tribe)), "重开后的商店不应出现未激活种族。");
+        return { beforeReset, afterReset };
+      })
+    );
+
+    results.push(
       await runScenario("combat-start", browser, url, async (page) => {
         await page.evaluate(() => {
           const api = window.__AUTO_CHESS_TEST_API__;
@@ -1036,10 +1149,10 @@ async function main() {
         await waitForBattleResult(page);
         const shieldState = await page.evaluate(() => ({
           logs: window.__AUTO_CHESS_TEST_API__.state.lastBattle.logs,
-          shieldBreaks: window.__AUTO_CHESS_TEST_API__.state.lastBattle.logs.filter((line) => line.includes("圣盾被打掉")).length,
+          shieldBreaks: window.__AUTO_CHESS_TEST_API__.state.lastBattle.logs.filter((line) => line.includes("护盾被打掉")).length,
         }));
 
-        assert(shieldState.shieldBreaks >= 1, "圣盾被打掉时应写入日志。");
+        assert(shieldState.shieldBreaks >= 1, "护盾被打掉时应写入日志。");
         return shieldState;
       })
     );
